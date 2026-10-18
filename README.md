@@ -9,6 +9,8 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Edit, enable/disable/delete plans and inspect the latest output and status.
 - Persistent run history with input/output snapshots, filters and pagination.
 - Reusable command templates with input fields and opt-in read-only object previews.
+- Multi-step workflows that run commands in the background and stop at the first failure.
+- Schedule a workflow as a fixed snapshot, with per-step progress in the run history.
 - Administrator access and CSRF protection on mutations.
 
 ## Security disclaimer
@@ -29,6 +31,9 @@ See [Tips and script examples](docs/tips.md), including
 
 See [Run history, templates and preview providers](docs/history-and-templates.md) for the new tabs,
 storage details and a preview-provider example.
+
+See [Workflows](docs/workflows.md) for sequential background runs, queued execution, snapshots and
+recovery after a worker interruption.
 
 ## Languages
 
@@ -111,7 +116,7 @@ Inline scripts accept `--dry-run`, verbose and quiet options; do not supply a sc
 3. Enter a name, first execution and recurrence; save the plan.
 
 Each plan stores a separate copy of the arguments and PHP code. Changing the direct-execution form does not
-change saved plans. Use **Bearbeiten** in the schedule list to update a saved plan's name, command,
+change saved plans. Use **Edit** in the schedule list to update a saved plan's name, command,
 arguments, PHP code, next execution, recurrence, enabled state and failure-notification settings.
 The ID, creation metadata and latest execution result are preserved. Running schedules cannot be edited.
 If another administrator or the worker changes the plan after the editor opens, saving is rejected with a
@@ -158,6 +163,43 @@ future runs and lets the current run finish. Running plans cannot be deleted.
 A filesystem lock prevents concurrent workers from claiming the same job. After an unexpected worker stop,
 the next worker marks an unfinished job interrupted and disables its schedule. Inspect its effects before
 rescheduling; jobs are not automatically retried because they may already have modified data.
+
+## Workflows
+
+The **Workflows** tab chains several commands into one background run. A workflow holds a label, an
+optional description and 1–20 ordered steps. Every step has its own label, a command from the catalog,
+a JSON argument array and, for `pimcore:run-script`, inline PHP code. **From direct execution** appends
+the command currently configured in the **Direct execution** tab. Up to 100 workflows can be stored.
+
+Steps run in order. The first failing step stops the workflow: its exit code and error become the
+result of the run, later steps are marked as skipped and are never executed. Each step is also recorded
+as its own history entry linked to the workflow run, so a failed step can be inspected on its own.
+Arguments, PHP code and protected global options are validated exactly like direct execution, once
+when the workflow is saved and again before every step.
+
+**Run now** only queues the run; the browser never blocks. The worker picks it up within one scheduler
+interval (ten seconds) once no schedule is due, and the run continues after Studio is closed. Queued
+runs store a snapshot of the definition: editing or deleting the workflow does not change a run that
+is already queued, and queueing fails with a conflict if the definition changed after the run was
+requested. The **Run history** tab shows the queued run and its steps with the trigger *Workflow*;
+scheduled workflow runs appear as *Scheduled* runs of the schedule.
+
+**Schedule workflow** creates an ordinary schedule that stores a fixed copy of all steps. The schedule's
+command, argument and PHP fields are read-only afterwards; to use changed steps, save the workflow and
+create a new schedule from it. Scheduled workflow runs use the schedule's failure notifications and show
+their step progress in the schedule details.
+
+Workflows share the worker's single runner lock with schedules: due schedules are claimed first and
+everything runs serially, so a long workflow delays later plans and a long plan delays queued workflows.
+
+If the worker stops in the middle of a workflow, the next tick marks the run and its active step as
+interrupted, marks the remaining steps as skipped and never replays the run automatically, because
+steps may already have changed data. Inspect the step history before running the workflow again.
+
+Definitions are stored in `var/command-center/<environment>/workflows/catalog.json` and pending runs in
+`workflow-queue/jobs.json`, next to schedules, templates and history, with the same requirements:
+shared storage for web and worker, no public access, and inclusion in backups. See
+[Workflows](docs/workflows.md) for the full behaviour.
 
 ## Development
 

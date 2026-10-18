@@ -116,7 +116,7 @@ command-center.ui.user: " · Nutzer {{id}}:"
 command-center.ui.exit-code: " · Exit-Code {{code}}"
 
 command-center.tabs.history: "Laufhistorie"
-command-center.history.help: "Alle neuen manuellen, geplanten und Vorlagen-Läufe bleiben mit Eingaben und Ausgabe erhalten. Laufende Jobs werden automatisch aktualisiert."
+command-center.history.help: "Alle neuen manuellen, geplanten, Vorlagen- und Workflow-Läufe bleiben mit Eingaben und Ausgabe erhalten. Laufende Jobs werden automatisch aktualisiert."
 command-center.history.search: "Command oder Bezeichnung suchen"
 command-center.history.refresh: "Aktualisieren"
 command-center.history.started: "Gestartet"

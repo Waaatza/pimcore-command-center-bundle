@@ -21,7 +21,7 @@
     },
     "globalName": "watza_command_center_bundle",
     "pluginVersion": "2.9.2",
-    "publicPath": "/bundles/pimcorecommandcenter/build/79b8cef3-97dc-4fa3-952d-2724493704a6/"
+    "publicPath": "/bundles/pimcorecommandcenter/build/08bfc93c-42b0-4646-b043-9e718ced3c39/"
   },
   "shared": [
     {
@@ -59,7 +59,7 @@
       "federationContainerName": "promise new Promise((resolve) => {\n    const emptyContainer = {\n      get: () => Promise.resolve(() => ({})),\n      init: () => {}\n    }\n\n    const remoteUrl = window.StudioUIBundleRemoteUrl\n\n    if (!remoteUrl) {\n      throw new Error('Required remote \"pimcore_studio_ui_bundle\" is not available');\n      return\n    }\n\n    // Check if the container is already available\n    if (window['pimcore_studio_ui_bundle']) {\n      resolve({\n        get: (request) => window['pimcore_studio_ui_bundle'].get(request),\n        init: (...arg) => {\n          try {\n            return window['pimcore_studio_ui_bundle'].init(...arg)\n          } catch(e) {\n            console.log('remote container already initialized')\n          }\n        }\n      })\n      return\n    }\n\n    const script = document.createElement('script')\n    script.src = remoteUrl\n    script.onload = () => {\n      const proxy = {\n        get: (request) => window['pimcore_studio_ui_bundle'].get(request),\n        init: (...arg) => {\n          try {\n            return window['pimcore_studio_ui_bundle'].init(...arg)\n          } catch(e) {\n            console.log('remote container already initialized')\n          }\n        }\n      }\n      resolve(proxy)\n    }\n    script.onerror = () => {\n      throw new Error('Failed to load required remote \"pimcore_studio_ui_bundle\" from ' + remoteUrl);\n    }\n    document.head.appendChild(script);\n  })\n  ",
       "moduleName": ".",
       "usedIn": [
-        "js/src/plugins.ts + 8 modules"
+        "js/src/plugins.ts + 10 modules"
       ],
       "version": "*"
     },
@@ -69,7 +69,7 @@
       "federationContainerName": "promise new Promise((resolve) => {\n    const emptyContainer = {\n      get: () => Promise.resolve(() => ({})),\n      init: () => {}\n    }\n\n    const remoteUrl = window.StudioUIBundleRemoteUrl\n\n    if (!remoteUrl) {\n      throw new Error('Required remote \"pimcore_studio_ui_bundle\" is not available');\n      return\n    }\n\n    // Check if the container is already available\n    if (window['pimcore_studio_ui_bundle']) {\n      resolve({\n        get: (request) => window['pimcore_studio_ui_bundle'].get(request),\n        init: (...arg) => {\n          try {\n            return window['pimcore_studio_ui_bundle'].init(...arg)\n          } catch(e) {\n            console.log('remote container already initialized')\n          }\n        }\n      })\n      return\n    }\n\n    const script = document.createElement('script')\n    script.src = remoteUrl\n    script.onload = () => {\n      const proxy = {\n        get: (request) => window['pimcore_studio_ui_bundle'].get(request),\n        init: (...arg) => {\n          try {\n            return window['pimcore_studio_ui_bundle'].init(...arg)\n          } catch(e) {\n            console.log('remote container already initialized')\n          }\n        }\n      }\n      resolve(proxy)\n    }\n    script.onerror = () => {\n      throw new Error('Failed to load required remote \"pimcore_studio_ui_bundle\" from ' + remoteUrl);\n    }\n    document.head.appendChild(script);\n  })\n  ",
       "moduleName": "app",
       "usedIn": [
-        "js/src/plugins.ts + 8 modules"
+        "js/src/plugins.ts + 10 modules"
       ],
       "version": "*"
     },
@@ -79,7 +79,7 @@
       "federationContainerName": "promise new Promise((resolve) => {\n    const emptyContainer = {\n      get: () => Promise.resolve(() => ({})),\n      init: () => {}\n    }\n\n    const remoteUrl = window.StudioUIBundleRemoteUrl\n\n    if (!remoteUrl) {\n      throw new Error('Required remote \"pimcore_studio_ui_bundle\" is not available');\n      return\n    }\n\n    // Check if the container is already available\n    if (window['pimcore_studio_ui_bundle']) {\n      resolve({\n        get: (request) => window['pimcore_studio_ui_bundle'].get(request),\n        init: (...arg) => {\n          try {\n            return window['pimcore_studio_ui_bundle'].init(...arg)\n          } catch(e) {\n            console.log('remote container already initialized')\n          }\n        }\n      })\n      return\n    }\n\n    const script = document.createElement('script')\n    script.src = remoteUrl\n    script.onload = () => {\n      const proxy = {\n        get: (request) => window['pimcore_studio_ui_bundle'].get(request),\n        init: (...arg) => {\n          try {\n            return window['pimcore_studio_ui_bundle'].init(...arg)\n          } catch(e) {\n            console.log('remote container already initialized')\n          }\n        }\n      }\n      resolve(proxy)\n    }\n    script.onerror = () => {\n      throw new Error('Failed to load required remote \"pimcore_studio_ui_bundle\" from ' + remoteUrl);\n    }\n    document.head.appendChild(script);\n  })\n  ",
       "moduleName": "components",
       "usedIn": [
-        "js/src/plugins.ts + 8 modules"
+        "js/src/plugins.ts + 10 modules"
       ],
       "version": "*"
     },
@@ -89,7 +89,7 @@
       "federationContainerName": "promise new Promise((resolve) => {\n    const emptyContainer = {\n      get: () => Promise.resolve(() => ({})),\n      init: () => {}\n    }\n\n    const remoteUrl = window.StudioUIBundleRemoteUrl\n\n    if (!remoteUrl) {\n      throw new Error('Required remote \"pimcore_studio_ui_bundle\" is not available');\n      return\n    }\n\n    // Check if the container is already available\n    if (window['pimcore_studio_ui_bundle']) {\n      resolve({\n        get: (request) => window['pimcore_studio_ui_bundle'].get(request),\n        init: (...arg) => {\n          try {\n            return window['pimcore_studio_ui_bundle'].init(...arg)\n          } catch(e) {\n            console.log('remote container already initialized')\n          }\n        }\n      })\n      return\n    }\n\n    const script = document.createElement('script')\n    script.src = remoteUrl\n    script.onload = () => {\n      const proxy = {\n        get: (request) => window['pimcore_studio_ui_bundle'].get(request),\n        init: (...arg) => {\n          try {\n            return window['pimcore_studio_ui_bundle'].init(...arg)\n          } catch(e) {\n            console.log('remote container already initialized')\n          }\n        }\n      }\n      resolve(proxy)\n    }\n    script.onerror = () => {\n      throw new Error('Failed to load required remote \"pimcore_studio_ui_bundle\" from ' + remoteUrl);\n    }\n    document.head.appendChild(script);\n  })\n  ",
       "moduleName": "api",
       "usedIn": [
-        "js/src/plugins.ts + 8 modules"
+        "js/src/plugins.ts + 10 modules"
       ],
       "version": "*"
     }
@@ -106,7 +106,7 @@
       "assets": {
         "js": {
           "sync": [
-            "static/js/async/__federation_expose_default_export.b140f7f595.js"
+            "static/js/async/__federation_expose_default_export.a75059f0d2.js"
           ],
           "async": []
         },

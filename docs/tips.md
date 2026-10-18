@@ -51,3 +51,6 @@ see [Failure notifications](../README.md#failure-notifications).
 
 Use [persistent history and templates](history-and-templates.md) to inspect past executions, create
 parameter forms for repeated tasks, and implement read-only previews of affected objects.
+
+Use [workflows](workflows.md) to chain several commands into one background run that stops at the
+first failure and keeps a history entry per step.

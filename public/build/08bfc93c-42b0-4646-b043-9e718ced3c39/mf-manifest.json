@@ -21,7 +21,7 @@
     },
     "globalName": "watza_command_center_bundle",
     "pluginVersion": "2.9.2",
-    "publicPath": "/bundles/pimcorecommandcenter/build/79b8cef3-97dc-4fa3-952d-2724493704a6/"
+    "publicPath": "/bundles/pimcorecommandcenter/build/08bfc93c-42b0-4646-b043-9e718ced3c39/"
   },
   "shared": [
     {
@@ -79,7 +79,7 @@
       "assets": {
         "js": {
           "sync": [
-            "static/js/async/__federation_expose_default_export.b140f7f595.js"
+            "static/js/async/__federation_expose_default_export.a75059f0d2.js"
           ],
           "async": []
         },

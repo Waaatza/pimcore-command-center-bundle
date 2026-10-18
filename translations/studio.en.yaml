@@ -116,7 +116,7 @@ command-center.ui.user: " · User {{id}}:"
 command-center.ui.exit-code: " · Exit code {{code}}"
 
 command-center.tabs.history: "Run history"
-command-center.history.help: "All new manual, scheduled and template runs are retained with their input and output. Running jobs refresh automatically."
+command-center.history.help: "All new manual, scheduled, template and workflow runs are retained with their input and output. Running jobs refresh automatically."
 command-center.history.search: "Search command or label"
 command-center.history.refresh: "Refresh"
 command-center.history.started: "Started"

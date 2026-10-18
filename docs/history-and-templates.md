@@ -3,12 +3,18 @@
 ## Persistent run history
 
 The **Run history** tab keeps every new execution started by the Command Center: direct commands,
-inline PHP scripts, scheduled jobs and templates. It stores start/end timestamps, duration, exit code,
+inline PHP scripts, scheduled jobs, templates and workflow runs. It stores start/end timestamps, duration, exit code,
 status, trigger, the initiating Studio user for direct/template runs, and a snapshot of the command,
 arguments, PHP source and combined stdout/stderr. Scheduled runs retain the schedule ID and label;
-template runs retain the template ID and label. Editing or deleting the source does not change these records.
+template runs retain the template ID and label; workflow runs retain the workflow ID and label.
+Editing or deleting the source does not change these records.
 
-Filter by command/label, status or trigger. The list is paginated (25 runs per page); details show the
+Workflow runs are recorded twice: once as the run of the workflow itself, and once per executed step,
+each step keeping its own input and output plus the parent run ID, step index and step label. Opening
+the details of a step offers **Open workflow run** to move back to the combined run; see
+[Workflows](workflows.md).
+
+Filter by command/label, status (including *Queued*) or trigger (including *Workflow*). The list is paginated (25 runs per page); details show the
 saved input and output. An active history tab refreshes every five seconds. The server updates output
 approximately once a second when output arrives and writes the final result when execution ends.
 Only the last 1 MB of output is retained per run; truncated output is explicitly marked.
