@@ -54,21 +54,33 @@ jobs:
         id: tag
         run: |
           TAG="${{ github.ref_name }}"
-          # Keep the annotator's message; ignore a message left by a previous CI build commit.
+          # Reuse the annotator's message as the release title and notes. Ignore a message
+          # left behind by a previous CI build commit so re-runs stay stable.
           MSG="$(git for-each-ref --format='%(contents)' "refs/tags/$TAG" | sed -e 's/[[:space:]]*$//')"
           if printf '%s\n' "$MSG" | head -n1 | grep -q '^Build assets for '; then MSG=""; fi
-          if [ -z "$MSG" ]; then MSG="Release $TAG"; fi
-          printf 'subject=%s\n' "$(printf '%s\n' "$MSG" | head -n1)" >> "$GITHUB_OUTPUT"
+          if [ -z "$MSG" ]; then MSG="$TAG"; fi
+          TITLE="$(printf '%s\n' "$MSG" | head -n1)"
+          BODY="$(printf '%s\n' "$MSG" | tail -n +2 | sed -e '/./,$!d')"
+          {
+            echo "title=$TITLE"
+            echo 'body<<RELEASE_NOTES_EOF'
+            printf '%s\n' "$BODY"
+            echo 'RELEASE_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
           git tag -f -a "$TAG" -m "$MSG" HEAD
           git push --force origin "refs/tags/$TAG"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: ${{ steps.tag.outputs.title }}
+          BODY: ${{ steps.tag.outputs.body }}
         run: |
-          TITLE="${{ steps.tag.outputs.subject }}"
-          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "$TITLE"
+          TAG="${{ github.ref_name }}"
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --notes "$BODY"
+          elif [ -n "$BODY" ]; then
+            gh release create "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --notes "$BODY"
           else
-            gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "$TITLE" --generate-notes
+            gh release create "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --generate-notes
           fi
