@@ -37,11 +37,11 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 
 **Use this bundle at your own risk, especially in production environments.** It allows administrators to
 execute console commands, arbitrary PHP code and, when enabled, an interactive shell in your application's
-environment. Incorrectly configured
-administrator accounts or permissions, compromised accounts, and unsafe commands or scripts can pose
-significant risks to the entire system, including data loss, disclosure of sensitive information and service
-disruption. Grant administrator access only to trusted, qualified users, review commands and scripts before
-execution, and maintain tested backups before using the bundle in production.
+environment. Incorrectly configured administrator accounts or permissions, compromised accounts, and unsafe
+commands or scripts can pose significant risks to the entire system, including data loss, disclosure of
+sensitive information and service disruption. Grant administrator access only to trusted, qualified users,
+review commands and scripts before execution, and maintain tested backups before using the bundle in
+production.
 
 ## Requirements
 
