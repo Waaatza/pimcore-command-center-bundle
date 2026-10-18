@@ -79,8 +79,8 @@ Inline scripts accept `--dry-run`, verbose and quiet options; do not supply a sc
 
 ## Scheduled executions
 
-1. Select/configure the command in **Direkt ausführen**.
-2. Switch to **Geplante Ausführungen**.
+1. Select/configure the command in the **Direct execution** tab.
+2. Switch to the **Scheduled executions** tab.
 3. Enter a name, first execution and recurrence; save the plan.
 
 Each plan stores a separate copy of the arguments and PHP code. Changing the direct-execution form does not
