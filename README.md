@@ -9,6 +9,8 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Edit, enable/disable/delete plans and inspect the latest output and status.
 - Administrator access and CSRF protection on mutations.
 
+![Pimcore Studio Command Control Center with inline PHP execution](docs/img/studio-command-control-center.png)
+
 ## Tips
 
 See [Tips and script examples](docs/tips.md), including
