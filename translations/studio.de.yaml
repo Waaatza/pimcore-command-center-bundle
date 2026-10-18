@@ -1,0 +1,13 @@
+command-center.title: Command Control Center
+command_center_list: List console commands
+command_center_run: Run console command
+command_center_list_success: Command catalog
+command_center_run_success: Command output stream
+command_center_schedules: Geplante Commands auflisten
+command_center_schedules_success: Gespeicherte Zeitpläne und Worker-Signal
+command_center_scheduledetail: Zeitplan und letzte Ausgabe anzeigen
+command_center_scheduledetail_success: Zeitplan und letztes Ergebnis
+command_center_createschedule: Command-Ausführung planen
+command_center_createschedule_success: Zeitplan erstellt
+command_center_scheduleaction: Zeitplan aktivieren, deaktivieren oder löschen
+command_center_scheduleaction_success: Zeitplan aktualisiert

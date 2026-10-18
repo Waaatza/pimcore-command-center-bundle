@@ -1,0 +1,7 @@
+/vendor/
+/assets/node_modules/
+/assets/dist/
+/assets/@mf-types/
+/.idea/
+/.DS_Store
+/composer.lock

@@ -1,0 +1,24 @@
+{
+  "entrypoints": {
+    "main": {
+      "js": [
+        "/bundles/pimcorecommandcenter/build/4e5e1d98-97e8-442b-ba7d-97d4c5c329e8/static/js/0.d12db1aa09.js",
+        "/bundles/pimcorecommandcenter/build/4e5e1d98-97e8-442b-ba7d-97d4c5c329e8/static/js/main.7cc4a23021.js"
+      ],
+      "css": []
+    },
+    "watza_command_center_bundle": {
+      "js": [
+        "/bundles/pimcorecommandcenter/build/4e5e1d98-97e8-442b-ba7d-97d4c5c329e8/static/js/async/__federation_expose_default_export.df77962ff2.js",
+        "/bundles/pimcorecommandcenter/build/4e5e1d98-97e8-442b-ba7d-97d4c5c329e8/static/js/remoteEntry.js"
+      ],
+      "css": []
+    },
+    "exposeRemote": {
+      "js": [
+        "/bundles/pimcorecommandcenter/build/4e5e1d98-97e8-442b-ba7d-97d4c5c329e8/exposeRemote.js"
+      ],
+      "css": []
+    }
+  }
+}

@@ -1,0 +1,72 @@
+name: Compatibility
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '8.3'
+            core: '^12.3'
+            studio: '^2025.4'
+            freeze: '^6'
+          - php: '8.4'
+            core: '^12.3'
+            studio: '^2025.4'
+            freeze: '^7'
+          - php: '8.5'
+            core: '^2026.3'
+            studio: '^2026.3'
+            freeze: '^7'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: simplexml, curl, dom, exif, gd, intl, mbstring, pdo_mysql, zip, sockets, bcmath
+          coverage: none
+          tools: composer:v2
+      - name: Validate manifest
+        run: composer validate --strict
+      - name: Select compatibility target
+        run: >-
+          composer require --no-update
+          'pimcore/pimcore:${{ matrix.core }}'
+          'pimcore/studio-ui-bundle:${{ matrix.studio }}'
+          'pimcore/studio-backend-bundle:${{ matrix.studio }}'
+          'pimcore/symfony-freeze:${{ matrix.freeze }}'
+      - name: Install dependencies
+        run: composer update --no-interaction --prefer-dist --no-scripts --no-plugins
+      - name: PHP syntax
+        run: find src tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Execution and scheduling checks
+        run: composer test
+
+  frontend:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: ['2025.4.0', '2026.3.2']
+    defaults:
+      run:
+        working-directory: assets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: assets/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Select SDK compatibility target
+        run: npm install --no-save --package-lock=false --ignore-scripts '@pimcore/studio-ui-bundle@${{ matrix.sdk }}'
+      - run: npm run check-types
+      - run: npm run build

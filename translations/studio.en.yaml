@@ -1,0 +1,13 @@
+command-center.title: Command Control Center
+command_center_list: List console commands
+command_center_run: Run console command
+command_center_list_success: Command catalog
+command_center_run_success: Command output stream
+command_center_schedules: List scheduled commands
+command_center_schedules_success: Stored schedules and worker heartbeat
+command_center_scheduledetail: Show schedule and latest output
+command_center_scheduledetail_success: Schedule and latest result
+command_center_createschedule: Schedule a command execution
+command_center_createschedule_success: Schedule created
+command_center_scheduleaction: Enable, disable or delete a schedule
+command_center_scheduleaction_success: Schedule updated
