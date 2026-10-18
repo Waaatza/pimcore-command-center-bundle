@@ -22,7 +22,7 @@ changed definition.
 **Delete workflow** removes only the definition. Queued runs, schedules and history keep the snapshot
 they captured, so past executions remain readable after the definition is gone.
 
-![Workflow editor](docs/img/workflow.png)
+![Workflow editor](img/workflow.png)
 
 ## Queued execution
 

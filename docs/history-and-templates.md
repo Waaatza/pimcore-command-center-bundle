@@ -26,7 +26,7 @@ After an abrupt process/worker termination, an unfinished record becomes **Inter
 ten minutes. Its actual finish time and exit code remain unknown. Commands still have a five-minute timeout.
 Disconnecting a direct/template run stops it when the server detects the disconnect; the history remains.
 
-![Run history](docs/img/run-history.png)
+![Run history](img/run-history.png)
 
 Records are private JSON files in `var/command-center/<environment>/history/`, with compact listing records
 in `history-summary/`. No database migration is required. Keep the entire `var/command-center` directory
@@ -48,7 +48,7 @@ The saved source is executed unchanged and recorded in history. Read resolved in
 inside PHP. Inline scripts accept only dry-run, verbose and quiet argument options, as in direct execution.
 Leaving the PHP field empty keeps the existing script-file argument mode.
 
-![Command templates](docs/img/templates.png)
+![Command templates](img/templates.png)
 
 Enter a label, description and JSON argument tokens. Add input fields using **Add field**:
 

@@ -4,7 +4,7 @@ Schedules run console commands and PHP scripts without an open browser. Create o
 in the **Direct execution** tab, switching to the **Scheduled executions** tab, and saving a name, first
 execution and recurrence (one-time, hourly, daily or weekly).
 
-![Scheduled executions](docs/img/scheduled-executions.png)
+![Scheduled executions](img/scheduled-executions.png)
 
 ## Plans
 

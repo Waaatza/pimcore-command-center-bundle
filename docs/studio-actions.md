@@ -9,7 +9,7 @@ The overview lists every action with its icon, target, placements, grants and st
 action from its row, or create one with **New action**. The editor groups the settings into sections for
 general setup, placements, grants, input bindings and output; saving reports back above the table.
 
-![Studio actions](docs/img/studio-actions.png)
+![Studio actions](img/studio-actions.png)
 
 ## Configure a button
 
