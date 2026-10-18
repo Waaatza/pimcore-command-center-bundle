@@ -9,6 +9,11 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Edit, enable/disable/delete plans and inspect the latest output and status.
 - Administrator access and CSRF protection on mutations.
 
+## Tips
+
+See [Tips and script examples](docs/tips.md), including
+[sending a Studio notification to all active users](docs/tips.md#notify-all-active-users).
+
 ## Compatibility
 
 | Platform | Pimcore core | Studio UI / Backend | PHP |
