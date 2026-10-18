@@ -1,0 +1,27 @@
+{
+  "entrypoints": {
+    "watza_command_center_bundle": {
+      "js": [
+        "/bundles/pimcorecommandcenter/build/8b6c0c2f-6650-4ab9-9c46-a5ba4e3cab82/static/js/async/__federation_expose_default_export.176ffd615c.js",
+        "/bundles/pimcorecommandcenter/build/8b6c0c2f-6650-4ab9-9c46-a5ba4e3cab82/static/js/async/e.dbbfb4402d.js",
+        "/bundles/pimcorecommandcenter/build/8b6c0c2f-6650-4ab9-9c46-a5ba4e3cab82/static/js/remoteEntry.js"
+      ],
+      "css": [
+        "/bundles/pimcorecommandcenter/build/8b6c0c2f-6650-4ab9-9c46-a5ba4e3cab82/static/css/async/__federation_expose_default_export.2b90f0d9d3.css"
+      ]
+    },
+    "main": {
+      "js": [
+        "/bundles/pimcorecommandcenter/build/8b6c0c2f-6650-4ab9-9c46-a5ba4e3cab82/static/js/0.d12db1aa09.js",
+        "/bundles/pimcorecommandcenter/build/8b6c0c2f-6650-4ab9-9c46-a5ba4e3cab82/static/js/main.689d9fb2d5.js"
+      ],
+      "css": []
+    },
+    "exposeRemote": {
+      "js": [
+        "/bundles/pimcorecommandcenter/build/8b6c0c2f-6650-4ab9-9c46-a5ba4e3cab82/exposeRemote.js"
+      ],
+      "css": []
+    }
+  }
+}
