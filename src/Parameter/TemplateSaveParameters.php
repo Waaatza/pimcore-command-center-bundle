@@ -17,6 +17,7 @@ final readonly class TemplateSaveParameters
         #[Assert\Count(max: 30)] public array $fields = [],
         public ?string $id = null,
         #[Assert\PositiveOrZero] public ?int $revision = null,
+        #[Assert\Length(max: 1000000)] public ?string $phpCode = null,
     ) {
     }
 }

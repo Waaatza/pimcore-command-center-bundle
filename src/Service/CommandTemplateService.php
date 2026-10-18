@@ -40,7 +40,9 @@ final readonly class CommandTemplateService
     {
         $this->commands->verifyCsrf($parameters->csrfToken);
         $this->validateDefinition($parameters);
-        $this->commands->validate(new CommandRunParameters($parameters->command, tokens: $parameters->tokens));
+        $this->commands->validate(new CommandRunParameters(
+            $parameters->command, tokens: $parameters->tokens, phpCode: $parameters->phpCode,
+        ));
 
         return $this->storage->transaction('templates', 'catalog', function (?array &$items) use ($parameters): array {
             $items ??= [];
@@ -49,7 +51,8 @@ final readonly class CommandTemplateService
             $item = [
                 'id' => $id, 'revision' => ($old['revision'] ?? 0) + 1,
                 'label' => trim($parameters->label), 'description' => trim($parameters->description),
-                'command' => $parameters->command, 'tokens' => $parameters->tokens, 'fields' => $parameters->fields,
+                'command' => $parameters->command, 'tokens' => $parameters->tokens,
+                'fields' => $parameters->fields, 'phpCode' => $parameters->phpCode,
                 'createdAt' => $old['createdAt'] ?? gmdate(DATE_ATOM), 'updatedAt' => gmdate(DATE_ATOM),
             ];
             $items[$id] = $item;
@@ -86,6 +89,7 @@ final readonly class CommandTemplateService
 
         return $this->commands->run($run, [
             'source' => 'template', 'templateId' => $item['id'], 'templateLabel' => $item['label'],
+            'inputValues' => $this->inputs->values($item['fields'], $parameters->values),
         ]);
     }
 
@@ -96,7 +100,7 @@ final readonly class CommandTemplateService
         $item = $this->find($this->storage->read('templates', 'catalog') ?? [], $parameters->id, $parameters->revision);
         $values = $this->inputs->values($item['fields'], $parameters->values);
         $tokens = $this->inputs->tokens($item['tokens'], $values);
-        $run = new CommandRunParameters($item['command'], $parameters->csrfToken, $tokens);
+        $run = new CommandRunParameters($item['command'], $parameters->csrfToken, $tokens, $item['phpCode'] ?? null);
         $this->commands->validate($run);
 
         return [$item, $run];

@@ -22,9 +22,10 @@ mkdir($directory . '/bin', 0700, true);
 file_put_contents($directory . '/bin/console', <<<'PHP'
 <?php
 if ($argv[4] === 'list') {
-    echo json_encode(['commands' => [['name' => 'test:preview'], ['name' => 'test:unsupported']]]); exit;
+    echo json_encode(['commands' => [['name' => 'test:preview'], ['name' => 'test:unsupported'], ['name' => 'pimcore:run-script']]]); exit;
 }
 file_put_contents(__DIR__ . '/../executed', json_encode(array_slice($argv, 4)));
+if ($argv[4] === 'pimcore:run-script') { include $argv[5]; exit; }
 echo 'template-executed';
 PHP);
 $csrf = new CsrfTokenManager();
@@ -123,5 +124,28 @@ try {
     $other = $service->save(new TemplateSaveParameters($token, 'Other', 'test:unsupported'));
     $check(!$service->preview(new TemplateActionParameters($token, $other['id'], 1))['supported'], 'Unsupported preview was simulated');
     $check(!$service->list()['items'][0]['previewSupported'], 'Unsupported command marked as previewable');
+    $code = 'echo "{{folder}}:" . json_decode(getenv("COMMAND_CENTER_INPUTS"), true)["folder"];';
+    $script = $service->save(new TemplateSaveParameters($token, 'PHP template', 'pimcore:run-script',
+        fields: [$fields[0]], phpCode: $code));
+    $check($script['phpCode'] === $code, 'Template PHP source not saved');
+    $scriptAction = new TemplateActionParameters($token, $script['id'], 1, ['folder' => '/safe']);
+    [, $resolved] = $service->resolve($scriptAction);
+    $check($resolved->phpCode === $code, 'Resolved template lost or interpolated PHP source');
+    $events = '';
+    ob_start(static function (string $chunk) use (&$events): string { $events .= $chunk; return ''; });
+    $service->run($scriptAction)->sendContent(); ob_end_flush();
+    $scriptEvents = array_map(static fn ($line) => json_decode($line, true), array_filter(explode("\n", $events)));
+    $check(str_contains(implode('', array_column($scriptEvents, 'text')), '{{folder}}:/safe'),
+        'Template PHP or JSON inputs did not execute');
+    $scriptHistory = $history->list(search: 'pimcore:run-script')['items'][0];
+    $check($history->get($scriptHistory['id'])['phpCode'] === $code, 'History lost PHP snapshot');
+    $scriptArgs = json_decode(file_get_contents($directory . '/executed'), true);
+    $check(!file_exists($scriptArgs[1]), 'Temporary PHP script was not removed');
+    $reject(fn () => $service->save(new TemplateSaveParameters($token, 'Invalid PHP', 'test:unsupported',
+        phpCode: $code)), BadRequestHttpException::class);
+    $reject(fn () => $service->save(new TemplateSaveParameters($token, 'Empty PHP', 'pimcore:run-script',
+        phpCode: '   ')), BadRequestHttpException::class);
+    $reject(fn () => $service->save(new TemplateSaveParameters($token, 'Invalid flags', 'pimcore:run-script',
+        tokens: ['some-file.php'], phpCode: $code)), BadRequestHttpException::class);
     echo "Command template and read-only preview checks passed.\n";
 } finally { $remove($directory); }

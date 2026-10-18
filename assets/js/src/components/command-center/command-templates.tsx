@@ -14,6 +14,7 @@ interface Template {
   description: string
   command: string
   tokens: string[]
+  phpCode?: string | null
   fields: Field[]
   previewSupported?: boolean
 }
@@ -126,7 +127,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
       })
       const parsed: unknown = JSON.parse(tokens)
       if (!Array.isArray(parsed) || !parsed.every(value => typeof value === 'string')) throw new Error(t('command-center.error.arguments'))
-      const response = await post('save', { id: editor.id ?? null, revision: editor.revision ?? null, label: editor.label, description: editor.description, command: editor.command, tokens: parsed, fields })
+      const response = await post('save', { id: editor.id ?? null, revision: editor.revision ?? null, label: editor.label, description: editor.description, command: editor.command, phpCode: editor.command === 'pimcore:run-script' ? editor.phpCode || null : null, tokens: parsed, fields })
       const saved = await response.json() as Template
       setSelected(saved.id); setValues({}); setPreview(undefined); setEditor(undefined); setRefresh(value => value + 1)
     })
@@ -141,10 +142,10 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
           onChange={(id: string) => { setSelected(id); setValues({}); setPreview(undefined); setEditor(undefined); setOutput(''); setDeletePending(false); setError('') }} />
       </Flex>
       <Button disabled={busy} onClick={() => edit(blank())}>{t('command-center.templates.new')}</Button>
-      <Button disabled={busy || draft.command === undefined || draft.phpCode !== null} onClick={() => {
+      <Button disabled={busy || draft.command === undefined} onClick={() => {
         try { const args: unknown = JSON.parse(draft.tokens)
           if (!Array.isArray(args) || !args.every(value => typeof value === 'string')) throw new Error(t('command-center.error.arguments'))
-          edit({ ...blank(), command: draft.command ?? '', tokens: args as string[] })
+          edit({ ...blank(), command: draft.command ?? '', tokens: args as string[], phpCode: draft.phpCode })
         } catch (reason) { setError(String(reason)) }
       }}>{t('command-center.templates.from-draft')}</Button>
       {item !== undefined && <Button disabled={busy} onClick={() => edit(item)}>{t('command-center.templates.edit')}</Button>}
@@ -162,11 +163,15 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
           <Form.Item label={ t('command-center.history.command') }>
             <Select style={ { width: '100%', maxWidth: 'none' } } showSearch value={editor.command || undefined}
               popupMatchSelectWidth={ false }
-              options={commands.map(name => ({ value: name, label: name }))} onChange={(command: string) => setEditor({ ...editor, command })} />
+              options={commands.map(name => ({ value: name, label: name }))} onChange={(command: string) => setEditor({ ...editor, command, phpCode: null })} />
           </Form.Item>
           <Form.Item label={ t('command-center.ui.arguments-json') }>
             <TextArea value={ tokens } rows={ 3 } onChange={ event => setTokens(event.target.value) } />
           </Form.Item>
+          {editor.command === 'pimcore:run-script' && <Form.Item label={t('command-center.ui.php-code')}>
+            <TextArea value={editor.phpCode ?? ''} rows={8} spellCheck={false} style={{ fontFamily: 'monospace' }}
+              onChange={event => setEditor({ ...editor, phpCode: event.target.value })} />
+          </Form.Item>}
           <Text type="secondary">{t('command-center.templates.placeholder-help').replaceAll('{folder}', '{{folder}}')}</Text>
           <Form.Item label={ t('command-center.templates.fields') } name="fields">
             <Block border maxItems={ 30 } noteditable={ busy }

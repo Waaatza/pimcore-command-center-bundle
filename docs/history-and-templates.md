@@ -39,6 +39,12 @@ all workers and web instances must see the same files and support atomic rename/
 ## Reusable templates
 
 In **Templates**, create a template or use **From direct execution** to copy a configured command.
+For `pimcore:run-script`, an additional PHP field accepts inline source, including code copied from direct execution.
+The saved source is executed unchanged and recorded in history. Read resolved input values with
+`json_decode(getenv('COMMAND_CENTER_INPUTS'), true, 512, JSON_THROW_ON_ERROR)`; placeholders are not expanded
+inside PHP. Inline scripts accept only dry-run, verbose and quiet argument options, as in direct execution.
+Leaving the PHP field empty keeps the existing script-file argument mode.
+
 Enter a label, description and JSON argument tokens. Add input fields using **Add field**:
 
 - **Text** for paths, names or other strings.

@@ -30,10 +30,10 @@ const dispatcher = {
   }
 }
 const components = new Proxy({
-  Form: { useForm: () => [{}], useWatch: () => undefined, Item: 'Form.Item' }
+  Form: { useForm: () => [{ getFieldsValue: () => ({ fields: [] }) }], useWatch: () => undefined, Item: 'Form.Item' }
 }, { get: (target, name) => target[name] ?? name })
 let revision = 1
-let pendingPreview
+let pendingPreview, savedTemplate
 const exports = {}
 const source = readFileSync(new URL('../js/src/components/command-center/command-templates.tsx', import.meta.url), 'utf8')
 const compiled = ts.transpileModule(source, {
@@ -50,8 +50,13 @@ runInNewContext(compiled, {
     if (name === './output') return { Output: 'Output' }
     throw new Error(`Unexpected import: ${name}`)
   },
-  AbortController,
-  fetch: async path => ({
+  AbortController, window: { setTimeout: callback => callback() },
+  fetch: async (path, options) => {
+    if (path === 'templates/save') {
+      savedTemplate = JSON.parse(options.body)
+      return { ok: true, json: async () => ({ ...savedTemplate, id: 'template', revision: 1 }) }
+    }
+    return ({
     ok: true,
     json: async () => {
       if (path === 'templates') return { items: [{
@@ -63,6 +68,7 @@ runInNewContext(compiled, {
       throw new Error(`Unexpected request: ${path}`)
     }
   })
+  }
 })
 const render = (active = true) => {
   cursor = 0
@@ -120,3 +126,22 @@ button(render(), 'command-center.templates.preview').props.onClick()
 await settle()
 assert.equal(button(render(), 'command-center.ui.execute').props.disabled, false, 'Fresh preview did not unlock execution')
 console.log('Template preview revision and delayed-response checks passed.')
+
+button(render(), 'command-center.templates.edit').props.onClick()
+let editorTree = render()
+const commandSelect = tree => nodes(tree).find(node => node.type === 'Select' && node.props.showSearch === true)
+commandSelect(editorTree).props.onChange('pimcore:run-script')
+editorTree = render()
+const phpField = tree => nodes(tree).find(node => node.type === 'TextArea' && node.props.spellCheck === false)
+assert.notEqual(phpField(editorTree), undefined, 'Script template has no PHP field')
+phpField(editorTree).props.onChange({ target: { value: 'echo "template";' } })
+button(render(), 'command-center.templates.save').props.onClick(); await settle()
+assert.equal(savedTemplate.phpCode, 'echo "template";', 'Template save lost PHP source')
+button(render(), 'command-center.templates.edit').props.onClick()
+commandSelect(render()).props.onChange('pimcore:run-script')
+phpField(render()).props.onChange({ target: { value: 'echo "discard";' } })
+commandSelect(render()).props.onChange('test:rename')
+assert.equal(phpField(render()), undefined, 'PHP field remained after command switch')
+button(render(), 'command-center.templates.save').props.onClick(); await settle()
+assert.equal(savedTemplate.phpCode, null, 'Non-script template retained PHP source')
+console.log('Template PHP editor, save payload and command-switch cleanup checked.')

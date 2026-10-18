@@ -10,7 +10,7 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Schedule one-time, hourly, daily or weekly executions.
 - Edit, enable/disable/delete plans and inspect the latest output and status.
 - Persistent run history with input/output snapshots, filters and pagination.
-- Reusable command templates with input fields and opt-in read-only object previews.
+- Reusable command templates with input fields, inline PHP and opt-in read-only object previews.
 - Multi-step workflows that run commands in the background and stop at the first failure.
 - Schedule a workflow as a fixed snapshot, with per-step progress in the run history.
 - Configurable Studio action buttons for templates/workflows, with user/role grants and fixed element context.
