@@ -53,8 +53,8 @@ Studio 2025.4.0 and 2026.3.2 are the frontend compatibility targets. A full appl
 performed in the development project on Pimcore/Studio 2026.3.2; CI does not provision an entire Pimcore database.
 
 Pimcore Platform 2025.4 uses core **12.3**, rather than a core version named 2025.4.
-The compiled frontend is included in this repository and Composer distributions, so installing the bundle
-in another project does not require Node.js.
+The compiled frontend ships with every tagged release (and therefore with Composer distributions), so installing the bundle
+in another project does not require Node.js. It is built by CI on the release tag; the default branch keeps only sources.
 
 ## Install
 
@@ -212,6 +212,20 @@ npm run check-translations
 npm run check-types
 npm run build
 ```
+
+The default branch contains sources only; `public/build/` is generated and is not committed.
+To release a version, commit the sources (including a version bump in `assets/package.json` and
+`assets/package-lock.json`, and the README's version constraint), then tag and push the tag:
+
+```sh
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin main vX.Y.Z
+```
+
+The `Release Build` workflow then installs the frontend dependencies, runs the build, commits the
+generated `public/build/` into the tag, updates the tag and creates the GitHub release with the
+generated release notes. A tag push alone therefore produces a complete, installable release;
+no local build commit is needed.
 
 For a local path installation in a host project, run the PHP tests against its dependencies:
 

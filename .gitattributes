@@ -1,7 +1,9 @@
-/.github export-ignore
-/tests export-ignore
-/assets export-ignore
-/.gitignore export-ignore
-/.gitattributes export-ignore
-
-/public/build/** linguist-generated=true -whitespace
+/assets               export-ignore
+/.github              export-ignore
+/tests                export-ignore
+/temp                 export-ignore
+/docs                 export-ignore
+/AGENTS.md            export-ignore
+/phpstan.neon.dist    export-ignore
+/phpunit.xml.dist     export-ignore
+/*.md                 export-ignore

@@ -1,0 +1,63 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: assets/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: assets
+        run: npm ci --ignore-scripts
+
+      - name: Build frontend
+        working-directory: assets
+        run: npm run build
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit built assets
+        run: |
+          git add -f public/build
+          if git diff --cached --quiet; then
+            echo "No build changes to commit."
+            exit 0
+          fi
+          git commit -m "Build assets for ${{ github.ref_name }}"
+
+      - name: Force-update tag
+        run: |
+          git tag -f "${{ github.ref_name }}" HEAD
+          git push --force origin "refs/tags/${{ github.ref_name }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
+          else
+            gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
+          fi

@@ -6,3 +6,6 @@
 /.DS_Store
 /composer.lock
 /temp/
+# Build assets are generated in CI for tags/releases
+/public/build/
+
