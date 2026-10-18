@@ -37,6 +37,12 @@ export interface ActionRequest {
   values?: Record<string, string>
 }
 
+export class ActionHttpError extends Error {
+  constructor (public readonly status: number) {
+    super(String(status))
+  }
+}
+
 export const actionsChanged = 'command-center-actions-changed'
 export const actionFetch = async (path: string, data?: object, signal?: AbortSignal): Promise<Response> => {
   const response = await fetch(commandCenterUrl(`actions/${path}`), {
@@ -44,6 +50,6 @@ export const actionFetch = async (path: string, data?: object, signal?: AbortSig
     headers: data === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: data === undefined ? undefined : JSON.stringify(data)
   })
-  if (!response.ok) throw new Error(String(response.status))
+  if (!response.ok) throw new ActionHttpError(response.status)
   return response
 }
