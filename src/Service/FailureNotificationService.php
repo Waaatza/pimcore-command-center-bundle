@@ -41,9 +41,8 @@ final readonly class FailureNotificationService implements FailureNotifierInterf
                         if (!$user->isAllowed('notifications')) {
                             throw new \RuntimeException('Recipient no longer has the notifications permission.');
                         }
-                        $message = nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
                         $this->notifications->sendNotification(
-                            new SendNotificationParameters($id, $title, $message), null,
+                            new SendNotificationParameters($id, $title, $text), null,
                         );
                     } else {
                         if (!filter_var($user->getEmail(), FILTER_VALIDATE_EMAIL)) {

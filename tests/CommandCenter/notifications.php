@@ -55,9 +55,9 @@ try {
         throw new RuntimeException('One failed delivery blocked other recipients or channels');
     }
     $message = $transport->messages[0]->getMessage();
-    if (str_contains($message, '<script>') || !str_contains($message, '&lt;script&gt;')
+    if (!str_contains($message, "\nCommand: test:fail\n") || str_contains($message, '<br')
         || str_contains($message, 'private-')) {
-        throw new RuntimeException('Notification content is not escaped or includes private execution data');
+        throw new RuntimeException('Notification content lost plain-text line breaks or includes private execution data');
     }
     if ($results[0]['status'] !== 'failed' || $results[2]['status'] !== 'sent') {
         throw new RuntimeException('Delivery results not recorded independently');
