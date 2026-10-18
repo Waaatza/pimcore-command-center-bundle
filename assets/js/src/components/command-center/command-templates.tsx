@@ -79,6 +79,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
   const run = async (): Promise<void> => {
     const abort = new AbortController(); controller.current = abort
     setOutput('')
+    setPreview(undefined)
     try {
       const response = await post('run', actionData(), abort.signal)
       if (response.body === null) throw new Error(t('command-center.error.stream'))
@@ -100,7 +101,12 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
         if (done) break
       }
       if (!completed) throw new Error(t('command-center.error.disconnected'))
-    } finally { controller.current = undefined; setPreview(undefined) }
+      if (item?.previewSupported === true) {
+        const updated = await post('preview', actionData(), abort.signal)
+        const result = await updated.json() as Preview
+        if (!abort.signal.aborted) setPreview(result)
+      }
+    } finally { controller.current = undefined }
   }
   const fieldUpdate = (index: number, change: Partial<Field>): void => {
     if (editor !== undefined) setEditor({ ...editor, fields: editor.fields.map((field, at) => at === index ? { ...field, ...change } : field) })
