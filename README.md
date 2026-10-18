@@ -68,7 +68,7 @@ Until the package is submitted to Packagist, add this GitHub repository to the h
 
 ```sh
 composer config repositories.command-center vcs https://github.com/Waaatza/pimcore-command-center-bundle
-composer require watza/command-center-bundle:^0.5
+composer require watza/command-center-bundle:^0.6
 ```
 
 Register the bundle in `config/bundles.php` if your installation did not register it automatically:
