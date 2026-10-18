@@ -223,14 +223,15 @@ To release a version, commit the sources (including a version bump in `assets/pa
 `assets/package-lock.json`, and the README's version constraint), then tag and push the tag:
 
 ```sh
-git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git tag -a vX.Y.Z -m "vX.Y.Z - short summary"    # or -F release-notes.md
 git push origin main vX.Y.Z
 ```
 
-The `Release Build` workflow then installs the frontend dependencies, runs the build, commits the
-generated `public/build/` into the tag, updates the tag and creates the GitHub release with the
-generated release notes. A tag push alone therefore produces a complete, installable release;
-no local build commit is needed.
+The annotated tag message is the release: its first line becomes the release title and the remaining
+lines become the release notes, so list the change points there. The `Release Build` workflow then
+installs the frontend dependencies, runs the build, commits the generated `public/build/` into the tag,
+updates the tag and creates the GitHub release. A tag push alone therefore produces a complete,
+installable release; no local build commit is needed.
 
 For a local path installation in a host project, run the PHP tests against its dependencies:
 
