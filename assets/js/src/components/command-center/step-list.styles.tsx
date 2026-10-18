@@ -1,11 +1,9 @@
-import { createStyles } from '@pimcore/studio-ui-bundle/app'
+import type { CSSProperties } from 'react'
 
-export const useStyles = createStyles(({ css }) => ({
-  list: css`
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 0;
-    padding-left: 20px;
-  `
-}))
+export const stepListStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+  margin: 0,
+  paddingLeft: 20
+}

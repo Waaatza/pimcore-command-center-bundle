@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { useStyles } from './output.styles'
+import { outputStyle } from './output.styles'
 
 export interface OutputProps {
   text?: string
@@ -12,10 +12,9 @@ export interface OutputProps {
 
 export const Output = forwardRef<HTMLPreElement, OutputProps>(({ text, label, minHeight, maxHeight, grow }, ref) => {
   const { t } = useTranslation()
-  const { styles } = useStyles({ minHeight, maxHeight, grow })
 
   return (
-    <pre ref={ ref } aria-label={ label ?? t('command-center.ui.output') } className={ styles.output }>
+    <pre ref={ ref } aria-label={ label ?? t('command-center.ui.output') } style={ outputStyle({ minHeight, maxHeight, grow }) }>
       {text !== undefined && text !== '' ? text : t('command-center.ui.no-output')}
     </pre>
   )

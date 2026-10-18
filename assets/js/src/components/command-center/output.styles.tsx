@@ -1,4 +1,4 @@
-import { createStyles } from '@pimcore/studio-ui-bundle/app'
+import type { CSSProperties } from 'react'
 
 export interface OutputStyleProps {
   minHeight?: number
@@ -6,22 +6,20 @@ export interface OutputStyleProps {
   grow?: boolean
 }
 
-export const useStyles = createStyles(({ css, token }, { minHeight, maxHeight, grow }: OutputStyleProps) => ({
-  output: css`
-    margin: 0;
-    padding: ${token.padding}px;
-    border: 1px solid ${token.colorBorderSecondary};
-    border-radius: ${token.borderRadius}px;
-    background: ${token.colorBgLayout};
-    color: ${token.colorText};
-    font-family: ${token.fontFamilyCode};
-    font-size: ${token.fontSize}px;
-    line-height: ${token.lineHeight};
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    overflow: auto;
-    min-height: ${minHeight === undefined ? '0' : `${minHeight}px`};
-    max-height: ${maxHeight === undefined ? 'none' : `${maxHeight}px`};
-    ${grow === true ? 'flex: 1;' : ''}
-  `
-}))
+export const outputStyle = ({ minHeight, maxHeight, grow }: OutputStyleProps): CSSProperties => ({
+  margin: 0,
+  padding: 16,
+  border: '1px solid #8886',
+  borderRadius: 6,
+  background: '#111827',
+  color: '#e5e7eb',
+  fontFamily: 'monospace',
+  fontSize: 14,
+  lineHeight: 1.5,
+  whiteSpace: 'pre-wrap',
+  overflowWrap: 'anywhere',
+  overflow: 'auto',
+  minHeight: minHeight === undefined ? 0 : minHeight,
+  maxHeight: maxHeight === undefined ? 'none' : maxHeight,
+  ...(grow === true ? { flex: 1 } : {})
+})
