@@ -1,0 +1,155 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
+import { setImmediate } from 'node:timers/promises'
+import React from 'react'
+import ts from 'typescript'
+
+const root = new URL('../js/src/', import.meta.url)
+const compile = (file, imports, globals = {}) => {
+  const exports = {}
+  const source = readFileSync(new URL(file, root), 'utf8')
+  runInNewContext(ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, esModuleInterop: true }
+  }).outputText, {
+    exports, require: name => {
+      if (name === 'react') return React
+      if (name in imports) return imports[name]
+      throw new Error(`Unexpected import: ${name}`)
+    }, AbortController, TextDecoder, setTimeout, clearTimeout, ...globals
+  })
+  return exports
+}
+const slots = []
+const registration = compile('modules/command-center.ts', {
+  '@pimcore/studio-ui-bundle': { container: { get: id => id === 'registry'
+    ? { registerToSlot: (slot, config) => slots.push({ slot, config }) }
+    : { registerWidget: () => {}, registerMainNavItem: () => {} } } },
+  '@pimcore/studio-ui-bundle/app': { serviceIds: { 'App/ComponentRegistry/ComponentRegistry': 'registry' } },
+  '../components/command-center/command-center': { CommandCenter: () => null },
+  '../components/command-center/studio-action-buttons': {
+    GlobalActionButtons: () => null, ObjectActionButtons: () => null,
+    AssetActionButtons: () => null, DocumentActionButtons: () => null
+  }
+})
+registration.CommandCenterModule.onInit()
+assert.deepEqual(slots.map(item => item.slot), [
+  'leftSidebar.slot', 'dataObject.editor.toolbar.slots.right',
+  'asset.editor.toolbar.slots.right', 'document.editor.toolbar.slots.right'
+])
+
+const app = { useTranslation: () => ({ t: key => key }) }
+const components = new Proxy({}, { get: (_, name) => name })
+const wrappers = compile('components/command-center/studio-action-buttons.tsx', {
+  '@pimcore/studio-ui-bundle/app': app,
+  '@pimcore/studio-ui-bundle/components': components,
+  '@pimcore/studio-ui-bundle/modules/data-object': { useDataObject: () => ({ id: 11 }) },
+  '@pimcore/studio-ui-bundle/modules/asset': { useAsset: () => ({ id: 12 }) },
+  '@pimcore/studio-ui-bundle/modules/document': { useDocument: () => ({ id: 13 }) },
+  './studio-actions-api': {}, './studio-action-dialog': {}
+})
+for (const [component, type, id] of [
+  ['ObjectActionButtons', 'object', 11], ['AssetActionButtons', 'asset', 12], ['DocumentActionButtons', 'document', 13]
+]) {
+  const tree = wrappers[component]()
+  assert.equal(tree.props.placement, type)
+  assert.equal(tree.props.context.type, type)
+  assert.equal(tree.props.context.id, id)
+  assert.equal('path' in tree.props.context, false)
+}
+assert.equal(wrappers.GlobalActionButtons().props.placement, 'global')
+
+// Exercise preparation, stale previews, redacted results and direct start through the actual dialog.
+const hooks = []
+let cursor = 0, effects = [], delayedPreview
+const cleanups = []
+const dispatcher = {
+  useState(initial) {
+    const index = cursor++
+    if (!(index in hooks)) hooks[index] = initial
+    return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value }]
+  },
+  useRef(initial) {
+    const index = cursor++
+    hooks[index] ??= { current: initial }
+    return hooks[index]
+  },
+  useEffect(effect, dependencies) {
+    const index = cursor++
+    if (hooks[index] === undefined || dependencies.some((value, position) => !Object.is(value, hooks[index][position]))) {
+      effects.push(effect); hooks[index] = dependencies
+    }
+  }
+}
+const calls = []
+let direct = false
+const dialog = compile('components/command-center/studio-action-dialog.tsx', {
+  '@pimcore/studio-ui-bundle/app': app,
+  '@pimcore/studio-ui-bundle/components': components,
+  './input-fields': { InputFields: 'InputFields' }, './output': { Output: 'Output' },
+  './studio-actions-api': { actionFetch: async (path, body) => {
+    calls.push({ path, body })
+    if (path === 'prepare') return { json: async () => ({
+      id: 'action', label: 'Approved', targetType: 'template', direct, previewSupported: true,
+      fields: [{ name: 'target', label: 'Target', type: 'string', required: true }], bound: []
+    }) }
+    if (path === 'preview') return { json: async () => delayedPreview ?? { supported: true, count: 1 } }
+    if (path === 'run') {
+      let delivered = false
+      return { headers: { get: () => 'application/x-ndjson' }, body: { getReader: () => ({ read: async () => {
+        if (delivered) return { done: true }
+        delivered = true
+        return { done: false, value: new TextEncoder().encode('{"type":"run","id":"own-run"}\n{"type":"exit","code":0}\n') }
+      } }) } }
+    }
+    throw new Error(`Unexpected action request: ${path}`)
+  } }
+})
+const request = { id: 'action', revision: 1, targetRevision: 1, placement: 'object', context: { type: 'object', id: 11 }, csrfToken: 'csrf' }
+const render = () => {
+  cursor = 0
+  const internal = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher
+  const previous = internal.current
+  internal.current = dispatcher
+  let tree
+  try { tree = dialog.StudioActionDialog({ request, onClose: () => {} }) } finally { internal.current = previous }
+  const queued = effects; effects = []
+  for (const effect of queued) { const cleanup = effect(); if (cleanup) cleanups.push(cleanup) }
+  return tree
+}
+const nodes = tree => Array.isArray(tree) ? tree.flatMap(nodes)
+  : React.isValidElement(tree) ? [tree, ...nodes(tree.props.children)] : []
+const button = (tree, key) => nodes(tree).find(node => node.type === 'Button' && node.props.children === key)
+const field = tree => nodes(tree).find(node => node.type === 'InputFields')
+const settle = async () => { await setImmediate(); await setImmediate() }
+render(); await settle()
+let tree = render()
+assert.equal(button(tree, 'command-center.ui.execute').props.disabled, true)
+field(tree).props.onChange({ target: 'first' })
+tree = render()
+button(tree, 'command-center.templates.preview').props.onClick(); await settle()
+tree = render()
+assert.equal(button(tree, 'command-center.ui.execute').props.disabled, false)
+let resolvePreview
+delayedPreview = new Promise(resolve => { resolvePreview = resolve })
+button(tree, 'command-center.templates.preview').props.onClick(); await settle()
+field(render()).props.onChange({ target: 'second' }); render()
+resolvePreview({ supported: true, count: 999 }); await settle()
+tree = render()
+assert.equal(button(tree, 'command-center.ui.execute').props.disabled, true, 'Old preview enabled new inputs')
+delayedPreview = undefined
+button(tree, 'command-center.templates.preview').props.onClick(); await settle()
+button(render(), 'command-center.ui.execute').props.onClick(); await settle()
+tree = render()
+const run = calls.find(call => call.path === 'run')
+assert.equal(run.body.values.target, 'second')
+assert.equal(run.body.context.id, 11)
+assert.equal('command' in run.body, false)
+assert.equal(nodes(tree).some(node => node.type === 'Output'), false, 'Status-only run invented output')
+assert.equal(nodes(tree).some(node => node.props.role === 'status' && node.props.children === 'command-center.history.status.success'), true)
+for (const cleanup of cleanups) cleanup()
+hooks.length = 0; effects = []; calls.length = 0; cleanups.length = 0; direct = true
+render(); await settle(); render(); await settle(); render()
+assert.equal(calls.filter(call => call.path === 'run').length, 1, 'Direct action started more than once')
+for (const cleanup of cleanups) cleanup()
+console.log('All toolbar slots, element bindings, preview snapshots, status-only results and direct start checked.')

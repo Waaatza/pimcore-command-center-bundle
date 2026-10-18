@@ -51,6 +51,9 @@ for (const [prefix, values] of Object.entries({
   'workflows.step-status': ['pending', 'running', 'success', 'failed', 'skipped', 'interrupted'],
   repeat: ['once', 'hourly', 'daily', 'weekly'],
   'templates.type': ['string', 'integer', 'choice'],
+  'actions.placement': ['global', 'object', 'asset', 'document'],
+  'actions.permission': ['read', 'write'],
+  'actions.binding': ['input', 'fixed', 'id', 'path', 'type'],
   'terminal.status': ['disconnected', 'connecting', 'connected', 'reconnecting']
 })) {
   for (const value of values) {

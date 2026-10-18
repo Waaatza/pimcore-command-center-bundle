@@ -13,8 +13,9 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Reusable command templates with input fields and opt-in read-only object previews.
 - Multi-step workflows that run commands in the background and stop at the first failure.
 - Schedule a workflow as a fixed snapshot, with per-step progress in the run history.
+- Configurable Studio action buttons for templates/workflows, with user/role grants and fixed element context.
 - Optional interactive Linux terminal with administrator-only shell sessions in Studio.
-- Administrator access and CSRF protection on mutations.
+- Administrator configuration and CSRF protection on mutations; editors can run explicitly approved Studio actions.
 
 ## Contents
 
@@ -27,6 +28,7 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - [Workflows](#workflows)
 - [Failure notifications](#failure-notifications)
 - [Background worker](#background-worker)
+- [Studio action buttons](#studio-action-buttons)
 - [Interactive terminal](#interactive-terminal)
 - [Languages](#languages)
 - [Development](#development)
@@ -165,6 +167,15 @@ php bin/console messenger:consume scheduler_command_center --memory-limit=250M -
 See [Scheduled executions and the background worker](docs/scheduling.md) for a Docker Compose example,
 heartbeat and locking details.
 
+## Studio action buttons
+
+Configure individual template/workflow buttons in **Command Center → Studio actions**. Place them in the
+left Studio rail or object, asset and document toolbars. Grant users/roles access, bind element values on
+the server and choose confirmation/output policies. New buttons are disabled and admin-only by default.
+Workflows also support typed input fields, CLI placeholders and JSON inputs for inline PHP steps.
+
+See [Studio action buttons](docs/studio-actions.md) for setup, permissions, examples and execution behaviour.
+
 ## Interactive terminal
 
 The **Terminal** tab opens a real, interactive shell in the environment that runs the terminal service. It is
@@ -188,6 +199,7 @@ npm run check-translations
 npm run check-types
 npm run check-template-preview
 npm run check-terminal
+npm run check-studio-actions
 npm run build
 ```
 
@@ -221,6 +233,8 @@ COMMAND_CENTER_AUTOLOAD=/path/to/project/vendor/autoload.php php tests/CommandCe
 ```
 
 ## Further reading
+
+- [Studio action buttons](docs/studio-actions.md): delegated actions, element bindings and workflow inputs.
 
 - [Interactive terminal](docs/terminal.md): optional Node.js service, proxy, security and activation.
 - [Tips and script examples](docs/tips.md), including

@@ -12,6 +12,7 @@ final readonly class CommandWorkflowRunner
         private PrivateJsonStorage $storage,
         private CommandCenterService $commands,
         private CommandHistoryStore $history,
+        private ?StudioActionAccess $actions = null,
     ) {
     }
 
@@ -36,7 +37,14 @@ final readonly class CommandWorkflowRunner
             return;
         }
         try {
+            if (isset($job['context']['actionId'])) {
+                if ($this->actions === null) throw new \RuntimeException('Action authorization unavailable.');
+                $this->actions->verifyQueued($job);
+            }
             $this->execute($job['workflow'], static function (array $event): void {}, [], $job['id']);
+        } catch (\Throwable $error) {
+            $this->interrupt($job['id']);
+            $this->history->finish($job['id'], 'failed', null, '', false, $error->getMessage());
         } finally {
             $this->storage->transaction('workflow-queue', 'jobs', static function (?array &$jobs) use ($job): void {
                 unset($jobs[$job['id']]);
@@ -75,8 +83,12 @@ final readonly class CommandWorkflowRunner
     {
         if ($id !== null) {
             $parent = $this->history->get($id);
-            $context = array_replace(array_intersect_key($parent, array_flip(['source', 'actorId', 'actorName'])), $context);
+            $context = array_replace(array_intersect_key($parent, array_flip([
+                'source', 'actorId', 'actorName', 'actionId', 'actionRevision', 'actionContext',
+                'actionPlacement', 'actionLabel', 'showOutput',
+            ])), $context);
         }
+        $context['inputValues'] = $workflow['values'] ?? [];
         $steps = array_map(static fn (array $step): array => $step + ['status' => 'pending'], $workflow['steps']);
         $context = array_replace($context, ['workflowId' => $workflow['id'], 'workflowLabel' => $workflow['label']]);
         $id ??= $this->history->start(new CommandRunParameters('workflow'), $context + ['workflowSteps' => $steps]);

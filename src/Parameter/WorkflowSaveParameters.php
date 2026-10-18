@@ -15,6 +15,7 @@ final readonly class WorkflowSaveParameters
         #[Assert\Count(min: 1, max: 20)] public array $steps = [],
         public ?string $id = null,
         public ?int $revision = null,
+        #[Assert\Count(max: 30)] public array $fields = [],
     ) {
     }
 }

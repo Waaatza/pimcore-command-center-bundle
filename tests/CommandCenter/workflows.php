@@ -130,5 +130,39 @@ try {
     flock($lock, LOCK_UN); fclose($lock);
     $scheduler->tick();
     $check($history->get($job['id'])['status'] === 'success', 'Idle scheduler did not consume workflow queue');
+    $field = ['name' => 'target', 'label' => 'Target', 'type' => 'integer', 'required' => true];
+    $parameterized = $workflows->save(new WorkflowSaveParameters($token, 'Inputs', steps: [
+        ['label' => 'Resolved', 'command' => 'test:step', 'tokens' => ['{{target}}']],
+    ], fields: [$field]));
+    $reject(fn () => $workflows->queue(new WorkflowActionParameters($token, $parameterized['id'], 1)),
+        BadRequestHttpException::class);
+    $reject(fn () => $workflows->resolve($parameterized['id'], 1, ['target' => 'abc']), BadRequestHttpException::class);
+    $reject(fn () => $workflows->resolve($parameterized['id'], 1, ['target' => '1', 'unknown' => 'x']),
+        BadRequestHttpException::class);
+    $security = new class implements \Pimcore\Bundle\StudioBackendBundle\Security\Service\SecurityServiceInterface {
+        public function getCurrentUser(): \Pimcore\Model\UserInterface {
+            $user = new \Pimcore\Model\User(); $user->setId(1); $user->setAdmin(true); return $user;
+        }
+        public function isLoggedIn(): bool { return true; }
+        public function hasElementPermission(\Pimcore\Model\Element\ElementInterface $e, \Pimcore\Model\UserInterface $u, string $p): void {}
+        public function hasElementPermissions(\Pimcore\Model\Element\ElementInterface $e, \Pimcore\Model\UserInterface $u, array $p): void {}
+        public function getSpecialDataObjectPermissions(\Pimcore\Model\DataObject $o, \Pimcore\Model\UserInterface $u, string $p): array { return []; }
+    };
+    $scheduleService = new \Watza\CommandCenterBundle\Service\CommandScheduleService(
+        $scheduleStore, $commands, $csrf, $security,
+        new \Watza\CommandCenterBundle\Service\ScheduleRecipientService(), $workflows,
+    );
+    $schedule = $scheduleService->create(new \Watza\CommandCenterBundle\Parameter\CommandScheduleParameters(
+        new CommandRunParameters('test:step', $token), 'Parameterized schedule', '2035-01-01T12:00:00Z',
+        workflow: ['id' => $parameterized['id'], 'revision' => 1, 'values' => ['target' => '42']],
+    ));
+    $check($schedule['workflow']['steps'][0]['tokens'] === ['42']
+        && $schedule['workflow']['values'] === ['target' => '42'], 'Schedule did not freeze resolved inputs.');
+    $workflows->save(new WorkflowSaveParameters($token, 'Changed inputs', steps: [$step('different')],
+        id: $parameterized['id'], revision: 1));
+    $check($scheduleStore->all()[1]['workflow']['steps'][0]['tokens'] === ['42'], 'Definition changed schedule snapshot.');
+    $legacy = $workflows->save(new WorkflowSaveParameters($token, 'Literal braces', steps: [$step('{{literal}}')]));
+    $check($workflows->resolve($legacy['id'], 1)['steps'][0]['tokens'] === ['{{literal}}'],
+        'Existing workflow arguments changed without input fields.');
     echo "Workflow queue, ordering, failure-stop, snapshots, scheduling and interruption checks passed.\n";
 } finally { $remove($directory); }

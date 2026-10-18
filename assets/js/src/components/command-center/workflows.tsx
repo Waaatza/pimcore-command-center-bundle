@@ -6,12 +6,13 @@ import { type CommandDraft } from './scheduled-commands'
 import { NotificationFields, type Recipient } from './notification-fields'
 import { WorkflowRunView } from './workflow-run'
 import { StepList } from './step-list'
+import { InputFields, InputFieldEditor, type InputField } from './input-fields'
 
 interface Step { label: string, command: string, tokens: string[], phpCode: string | null }
-interface Workflow { id: string, revision: number, label: string, description: string, steps: Step[] }
+interface Workflow { id: string, revision: number, label: string, description: string, steps: Step[], fields?: InputField[] }
 interface EditableStep { label: string, command: string, tokens: string, phpCode: string | null }
 interface Editor { id?: string, revision?: number }
-interface EditorValues { label: string, description: string, steps: EditableStep[] }
+interface EditorValues { label: string, description: string, steps: EditableStep[], fields: InputField[] }
 const emptyStep = (): EditableStep => ({ label: '', command: '', tokens: '[]', phpCode: null })
 const normalizeStep = (step: Partial<EditableStep> | undefined): EditableStep => ({
   label: step?.label ?? '', command: step?.command ?? '', tokens: step?.tokens ?? '[]', phpCode: step?.phpCode ?? null
@@ -50,8 +51,10 @@ export const Workflows = ({ active, draft, onScheduled }: {
   const [recipients, setRecipients] = useState<Recipient[]>([])
   const [selected, setSelected] = useState<string>()
   const [editor, setEditor] = useState<Editor>()
-  const [initial, setInitial] = useState<EditorValues>({ label: '', description: '', steps: [] })
+  const [initial, setInitial] = useState<EditorValues>({ label: '', description: '', steps: [], fields: [] })
   const [session, setSession] = useState(0)
+  const [values, setValues] = useState<Record<string, string>>({})
+  const watchedFields = Form.useWatch('fields', editorForm) as InputField[] | undefined
   const [runId, setRunId] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -124,7 +127,7 @@ export const Workflows = ({ active, draft, onScheduled }: {
       ? [emptyStep()]
       : workflow.steps.map(step => ({ ...step, tokens: JSON.stringify(step.tokens, null, 2) }))
     stepsRef.current = steps.map(step => ({ ...step }))
-    setInitial({ label: workflow?.label ?? '', description: workflow?.description ?? '', steps })
+    setInitial({ label: workflow?.label ?? '', description: workflow?.description ?? '', steps, fields: workflow?.fields ?? [] })
     setEditor({ id: workflow?.id, revision: workflow?.revision })
     setSession(current => current + 1)
   }
@@ -149,7 +152,7 @@ export const Workflows = ({ active, draft, onScheduled }: {
         if (!Array.isArray(tokens) || !tokens.every(value => typeof value === 'string')) throw new Error(t('command-center.error.arguments'))
         return { label: step.label, command: step.command, tokens, phpCode: step.command === 'pimcore:run-script' ? step.phpCode : null }
       })
-      const response = await post('workflows/save', { label: values.label, description: values.description, id: editor?.id ?? null, revision: editor?.revision ?? null, steps })
+      const response = await post('workflows/save', { label: values.label, description: values.description, id: editor?.id ?? null, revision: editor?.revision ?? null, steps, fields: values.fields ?? [] })
       const saved = await response.json() as Workflow
       setSelected(saved.id); setEditor(undefined); setRefresh(value => value + 1)
     })
@@ -160,7 +163,7 @@ export const Workflows = ({ active, draft, onScheduled }: {
       <Flex style={ { flex: 1 } }>
         <Select disabled={busy} style={ { width: '100%', maxWidth: 'none' } } placeholder={t('command-center.workflows.choose')} value={selected}
           options={items.map(value => ({ value: value.id, label: value.label }))} onChange={(id: string) => {
-            setSelected(id); setEditor(undefined); setDeleting(false); setScheduling(false); setRunId(undefined); setError('')
+            setSelected(id); setValues({}); setEditor(undefined); setDeleting(false); setScheduling(false); setRunId(undefined); setError('')
           }} />
       </Flex>
       <Button disabled={busy} onClick={() => edit()}>{t('command-center.workflows.new')}</Button>
@@ -175,6 +178,12 @@ export const Workflows = ({ active, draft, onScheduled }: {
           </Form.Item>
           <Form.Item label={ t('command-center.templates.description') } name="description">
             <TextArea />
+          </Form.Item>
+          <Form.Item label={t('command-center.actions.fields')} name="fields">
+            <Block border maxItems={30} noteditable={busy}
+              getItemTitle={(value: InputField | undefined) => value?.label || t('command-center.actions.field')}>
+              {({ blockIndex }) => <InputFieldEditor field={watchedFields?.[blockIndex]} />}
+            </Block>
           </Form.Item>
           <Form.Item label={ t('command-center.workflows.steps') } name="steps">
             <Block border maxItems={ 20 } noteditable={ busy }
@@ -193,12 +202,15 @@ export const Workflows = ({ active, draft, onScheduled }: {
       <Flex vertical gap={ 12 }>
         <Title level={ 3 }>{item.label}</Title>
         <Text>{item.description}</Text>
+        <FormKit wrapInPanel={false} formProps={{ disabled: busy }}>
+          <InputFields fields={item.fields ?? []} values={values} onChange={setValues} />
+        </FormKit>
         <StepList items={ item.steps.map((step, index) => (
           <React.Fragment key={ index }><Text strong>{step.label}</Text> · <Text code>{step.command}</Text></React.Fragment>
         )) } />
         <Flex gap={ 12 }>
           <Button type="primary" disabled={busy} onClick={() => { void perform(async () => {
-            const response = await post('workflows/run', { id: item.id, revision: item.revision })
+            const response = await post('workflows/run', { id: item.id, revision: item.revision, values })
             const run = await response.json() as { id: string }; setRunId(run.id)
           }) }}>{t('command-center.workflows.run')}</Button>
           <Button disabled={busy} onClick={() => { setScheduling(true); setDeleting(false) }}>{t('command-center.workflows.schedule')}</Button>
@@ -209,7 +221,7 @@ export const Workflows = ({ active, draft, onScheduled }: {
             <Alert type="warning" message={ t('command-center.workflows.delete-confirm') } />
             <Flex gap={ 12 }>
               <Button danger disabled={busy} onClick={() => { void perform(async () => {
-                await post('workflows/delete', { id: item.id, revision: item.revision }); setSelected(undefined); setDeleting(false); setRefresh(value => value + 1)
+                await post('workflows/delete', { id: item.id, revision: item.revision, values }); setSelected(undefined); setDeleting(false); setRefresh(value => value + 1)
               }) }}>{t('command-center.workflows.delete')}</Button>
               <Button disabled={busy} onClick={() => setDeleting(false)}>{t('command-center.templates.cancel')}</Button>
             </Flex>
@@ -232,7 +244,7 @@ export const Workflows = ({ active, draft, onScheduled }: {
                     if (new Date(runAt).getTime() <= Date.now()) throw new Error(t('command-center.error.future-date'))
                     await post('schedules/create', { label: item.label, runAt: new Date(runAt).toISOString(), repeat, timezone,
                       notificationRecipientIds: recipientIds, notificationChannels: channels,
-                      execution: { command: item.steps[0].command, tokens: item.steps[0].tokens, phpCode: item.steps[0].phpCode, csrfToken }, workflow: { id: item.id, revision: item.revision } })
+                      execution: { command: item.steps[0].command, tokens: item.steps[0].tokens, phpCode: item.steps[0].phpCode, csrfToken }, workflow: { id: item.id, revision: item.revision, values } })
                     setScheduling(false); onScheduled()
                   }) }}>{t('command-center.ui.save-schedule')}</Button>
                   <Button disabled={busy} onClick={() => setScheduling(false)}>{t('command-center.templates.cancel')}</Button>

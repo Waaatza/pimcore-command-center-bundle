@@ -19,6 +19,7 @@ final readonly class CommandWorkflowService
         private CommandCenterService $commands,
         private CommandHistoryStore $history,
         private ?SecurityServiceInterface $security = null,
+        private CommandInputResolver $inputs = new CommandInputResolver(),
     ) {
     }
 
@@ -49,6 +50,7 @@ final readonly class CommandWorkflowService
             || count($parameters->steps) < 1 || count($parameters->steps) > 20) {
             throw new BadRequestHttpException('A workflow requires a label and 1–20 steps.');
         }
+        $this->inputs->validateFields($parameters->fields);
         $steps = [];
         foreach ($parameters->steps as $step) {
             if (!is_array($step) || array_diff(array_keys($step), ['label', 'command', 'tokens', 'phpCode'])
@@ -63,6 +65,7 @@ final readonly class CommandWorkflowService
                     throw new BadRequestHttpException('Step arguments must be strings.');
                 }
             }
+            if ($parameters->fields !== []) $this->inputs->validateTokens($step['tokens'], $parameters->fields);
             $run = new CommandRunParameters($step['command'], tokens: $step['tokens'], phpCode: $step['phpCode'] ?? null);
             $this->commands->validate($run);
             $steps[] = ['label' => trim($step['label']), 'command' => $run->command,
@@ -81,6 +84,7 @@ final readonly class CommandWorkflowService
             $id = $old['id'] ?? bin2hex(random_bytes(16));
             return $items[$id] = ['id' => $id, 'revision' => ($old['revision'] ?? 0) + 1,
                 'label' => trim($parameters->label), 'description' => trim($parameters->description), 'steps' => $steps,
+                'fields' => $parameters->fields,
                 'createdAt' => $old['createdAt'] ?? gmdate(DATE_ATOM), 'updatedAt' => gmdate(DATE_ATOM)];
         });
     }
@@ -94,22 +98,46 @@ final readonly class CommandWorkflowService
         });
     }
 
+    public function resolve(string $id, ?int $revision, array $values = []): array
+    {
+        $workflow = $this->snapshot($id, $revision);
+        $values = $this->inputs->values($workflow['fields'] ?? [], $values);
+        foreach ($workflow['steps'] as &$step) {
+            if (($workflow['fields'] ?? []) !== []) {
+                $step['tokens'] = $this->inputs->tokens($step['tokens'], $values);
+            }
+            $this->commands->validate(new CommandRunParameters(
+                $step['command'], tokens: $step['tokens'], phpCode: $step['phpCode'] ?? null,
+            ));
+        }
+        unset($step);
+        $workflow['values'] = $values;
+
+        return $workflow;
+    }
+
     public function queue(WorkflowActionParameters $parameters): array
     {
         $this->commands->verifyCsrf($parameters->csrfToken);
-        $workflow = $this->snapshot($parameters->id, $parameters->revision);
+        $workflow = $this->resolve($parameters->id, $parameters->revision, $parameters->values);
         $user = $this->security?->getCurrentUser();
-        return $this->storage->transaction('workflow-queue', 'jobs', function (?array &$jobs) use ($workflow, $user): array {
+        return $this->queueSnapshot($workflow, ['actorId' => $user?->getId(), 'actorName' => $user?->getName()]);
+    }
+
+    public function queueSnapshot(array $workflow, array $context): array
+    {
+        $context['inputValues'] = $workflow['values'] ?? [];
+        return $this->storage->transaction('workflow-queue', 'jobs', function (?array &$jobs) use ($workflow, $context): array {
             $jobs ??= [];
             if (count($jobs) >= 100) {
                 throw new BadRequestHttpException('Maximum of 100 queued workflows reached.');
             }
             $id = $this->history->start(new CommandRunParameters('workflow'), [
                 'source' => 'workflow', 'workflowId' => $workflow['id'], 'workflowLabel' => $workflow['label'],
-                'actorId' => $user?->getId(), 'actorName' => $user?->getName(),
+                ...$context,
                 'workflowSteps' => array_map(static fn (array $step): array => $step + ['status' => 'pending'], $workflow['steps']),
             ], 'queued');
-            $jobs[$id] = ['id' => $id, 'workflow' => $workflow, 'status' => 'queued'];
+            $jobs[$id] = ['id' => $id, 'workflow' => $workflow, 'status' => 'queued', 'context' => $context];
 
             return ['id' => $id, 'status' => 'queued'];
         });

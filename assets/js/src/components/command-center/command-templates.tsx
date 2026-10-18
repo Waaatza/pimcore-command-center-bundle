@@ -1,18 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Block, Button, Flex, Form, FormKit, Input, Select, Switch, Text, TextArea, Title } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Block, Button, Flex, Form, FormKit, Input, Select, Text, TextArea, Title } from '@pimcore/studio-ui-bundle/components'
 import { commandCenterUrl } from './api'
 import { Output } from './output'
+import { InputFieldEditor as TemplateFieldRow, type InputField as Field } from './input-fields'
 import { type CommandDraft } from './scheduled-commands'
 
-interface Field {
-  name: string
-  label: string
-  type: 'string' | 'integer' | 'choice'
-  required?: boolean
-  default?: string
-  choices?: string[]
-}
+
 interface Template {
   id?: string
   revision?: number
@@ -34,41 +28,6 @@ interface EditorValues {
 }
 const blank = (): Template => ({ label: '', description: '', command: '', tokens: [], fields: [] })
 
-const RequiredField = ({ value, onChange }: { value?: boolean, onChange?: (value: boolean) => void }): React.JSX.Element => (
-  <Switch checked={ value === true } onChange={ (checked) => onChange?.(checked) } />
-)
-
-const ChoicesField = ({ value, onChange }: { value?: string[] | null, onChange?: (value: string[]) => void }): React.JSX.Element => (
-  <TextArea value={ (value ?? []).join('\n') } onChange={ event => onChange?.(event.target.value.split('\n')) } />
-)
-
-const TemplateFieldRow = ({ field }: { field?: Field }): React.JSX.Element => {
-  const { t } = useTranslation()
-  return (
-    <>
-      <Form.Item label={ t('command-center.templates.field-name') } name="name" initialValue="">
-        <Input />
-      </Form.Item>
-      <Form.Item label={ t('command-center.templates.label') } name="label" initialValue="">
-        <Input />
-      </Form.Item>
-      <Form.Item label={ t('command-center.templates.type') } name="type" initialValue="string">
-        <Select options={ ['string', 'integer', 'choice'].map(type => ({ value: type, label: t(`command-center.templates.type.${type}`) })) } />
-      </Form.Item>
-      <Form.Item label={ t('command-center.templates.default') } name="default" initialValue="">
-        <Input />
-      </Form.Item>
-      {field?.type === 'choice' && (
-        <Form.Item label={ t('command-center.templates.choices') } name="choices">
-          <ChoicesField />
-        </Form.Item>
-      ) }
-      <Form.Item label={ t('command-center.templates.required') } name="required" initialValue={ true }>
-        <RequiredField />
-      </Form.Item>
-    </>
-  )
-}
 
 export const CommandTemplates = ({ active, draft }: { active: boolean, draft: CommandDraft }): React.JSX.Element => {
   const { t } = useTranslation()

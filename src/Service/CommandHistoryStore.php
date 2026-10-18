@@ -22,6 +22,7 @@ final readonly class CommandHistoryStore
         ], array_intersect_key($context, array_flip([
             'source', 'actorId', 'actorName', 'scheduleId', 'scheduleLabel', 'templateId', 'templateLabel',
             'workflowId', 'workflowLabel', 'parentRunId', 'stepIndex', 'stepLabel', 'workflowSteps',
+            'actionId', 'actionRevision', 'actionLabel', 'actionContext', 'actionPlacement', 'showOutput', 'inputValues',
         ])), [
             'id' => $id, 'command' => $parameters->command, 'tokens' => $parameters->tokens,
             'phpCode' => $parameters->phpCode, 'createdAt' => gmdate(DATE_ATOM),
@@ -120,7 +121,7 @@ final readonly class CommandHistoryStore
 
     private function summary(array $record): array
     {
-        unset($record['tokens'], $record['phpCode'], $record['output'], $record['workflowSteps']);
+        unset($record['tokens'], $record['phpCode'], $record['output'], $record['workflowSteps'], $record['inputValues']);
 
         return $record;
     }

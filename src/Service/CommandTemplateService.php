@@ -21,6 +21,7 @@ final readonly class CommandTemplateService
         private CommandCenterService $commands,
         #[TaggedIterator('command_center.preview_provider')]
         private iterable $previewProviders = [],
+        private CommandInputResolver $inputs = new CommandInputResolver(),
     ) {
     }
 
@@ -89,38 +90,12 @@ final readonly class CommandTemplateService
     }
 
     /** @return array{array, CommandRunParameters} */
-    private function resolve(TemplateActionParameters $parameters): array
+    public function resolve(TemplateActionParameters $parameters): array
     {
         $this->commands->verifyCsrf($parameters->csrfToken);
         $item = $this->find($this->storage->read('templates', 'catalog') ?? [], $parameters->id, $parameters->revision);
-        $values = $parameters->values;
-        $known = array_column($item['fields'], 'name');
-        if (array_diff(array_keys($values), $known) !== []) {
-            throw new BadRequestHttpException('Unknown template field.');
-        }
-        foreach ($item['fields'] as $field) {
-            $value = $values[$field['name']] ?? ($field['default'] ?? '');
-            if (!is_string($value) || strlen($value) > 4096 || str_contains($value, "\0")
-                || (($field['required'] ?? false) && trim($value) === '')
-                || (($field['type'] === 'integer') && $value !== '' && !preg_match('/^-?\d+$/D', $value))
-                || (($field['type'] === 'choice') && $value !== '' && !in_array($value, $field['choices'], true))) {
-                throw new BadRequestHttpException('Invalid template value: ' . $field['name']);
-            }
-            $values[$field['name']] = $value;
-        }
-        $tokens = array_map(static function (string $token) use ($values): string {
-            $resolved = preg_replace_callback('/\{\{([a-zA-Z][a-zA-Z0-9_]*)\}\}/',
-                static fn (array $match): string => $values[$match[1]], $token);
-            // A positional placeholder must not introduce a new CLI option.
-            if (str_starts_with($token, '{{') && str_starts_with($resolved, '-')) {
-                throw new BadRequestHttpException('A positional template value cannot start with a dash.');
-            }
-            if (strlen($resolved) > 8192) {
-                throw new BadRequestHttpException('Resolved argument is too long.');
-            }
-
-            return $resolved;
-        }, $item['tokens']);
+        $values = $this->inputs->values($item['fields'], $parameters->values);
+        $tokens = $this->inputs->tokens($item['tokens'], $values);
         $run = new CommandRunParameters($item['command'], $parameters->csrfToken, $tokens);
         $this->commands->validate($run);
 
@@ -145,39 +120,13 @@ final readonly class CommandTemplateService
             || count($parameters->fields) > 30) {
             throw new BadRequestHttpException('Invalid template definition.');
         }
-        $names = [];
-        foreach ($parameters->fields as $field) {
-            if (!is_array($field) || array_diff(array_keys($field), ['name', 'label', 'type', 'required', 'default', 'choices'])
-                || !is_string($field['name'] ?? null) || !preg_match('/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/D', $field['name'])
-                || in_array($field['name'], $names, true) || !is_string($field['label'] ?? null)
-                || trim($field['label']) === '' || strlen($field['label']) > 120
-                || !in_array($field['type'] ?? null, ['string', 'integer', 'choice'], true)
-                || (isset($field['required']) && !is_bool($field['required']))
-                || (isset($field['default']) && (!is_string($field['default']) || strlen($field['default']) > 4096))) {
-                throw new BadRequestHttpException('Invalid or duplicate template field.');
-            }
-            $choices = $field['choices'] ?? [];
-            if (!is_array($choices) || !array_is_list($choices) || count($choices) > 100
-                || ($field['type'] === 'choice' && $choices === [])) {
-                throw new BadRequestHttpException('Choice fields need a list of choices.');
-            }
-            foreach ($choices as $choice) {
-                if (!is_string($choice) || strlen($choice) > 4096) {
-                    throw new BadRequestHttpException('Invalid choice value.');
-                }
-            }
-            $names[] = $field['name'];
-        }
-        foreach ($parameters->tokens as $token) {
-            if (!is_string($token) || strlen($token) > 8192) {
-                throw new BadRequestHttpException('Arguments must be strings.');
-            }
-            preg_match_all('/\{\{([a-zA-Z][a-zA-Z0-9_]*)\}\}/', $token, $matches);
-            $remaining = preg_replace('/\{\{([a-zA-Z][a-zA-Z0-9_]*)\}\}/', '', $token);
-            if (array_diff($matches[1], $names) || str_contains($remaining, '{{') || str_contains($remaining, '}}')) {
-                throw new BadRequestHttpException('Unknown or invalid template placeholder.');
-            }
-        }
+        $this->inputs->validateFields($parameters->fields);
+        $this->inputs->validateTokens($parameters->tokens, $parameters->fields);
+    }
+
+    public function hasPreview(string $command): bool
+    {
+        return $this->provider($command) !== null;
     }
 
     private function provider(string $command): ?CommandPreviewProviderInterface

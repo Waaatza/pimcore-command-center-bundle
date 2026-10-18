@@ -46,6 +46,7 @@ runInNewContext(compiled, {
     if (name === '@pimcore/studio-ui-bundle/app') return { useTranslation: () => ({ t: key => key }) }
     if (name === '@pimcore/studio-ui-bundle/components') return components
     if (name === './api') return { commandCenterUrl: path => path }
+    if (name === './input-fields') return { InputFieldEditor: 'InputFieldEditor' }
     if (name === './output') return { Output: 'Output' }
     throw new Error(`Unexpected import: ${name}`)
   },

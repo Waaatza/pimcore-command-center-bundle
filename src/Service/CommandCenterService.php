@@ -46,7 +46,7 @@ final readonly class CommandCenterService
         return json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
     }
 
-    public function run(CommandRunParameters $parameters, array $context = []): StreamedResponse
+    public function run(CommandRunParameters $parameters, array $context = [], bool $hideOutput = false): StreamedResponse
     {
         $this->verifyCsrf($parameters->csrfToken);
         $this->validate($parameters);
@@ -55,10 +55,14 @@ final readonly class CommandCenterService
         $context = array_replace(['source' => 'manual', 'actorId' => $user?->getId(),
             'actorName' => $user?->getName()], $context);
 
-        return new StreamedResponse(function () use ($parameters, $context): void {
+        return new StreamedResponse(function () use ($parameters, $context, $hideOutput): void {
             set_time_limit(330);
             $previousIgnoreAbort = ignore_user_abort(true);
-            $emit = static function (array $event): void {
+            $emit = static function (array $event) use ($hideOutput): void {
+                if ($hideOutput && isset($event['text'])) {
+                    if ($event['type'] !== 'error') return;
+                    $event['text'] = 'Action failed.';
+                }
                 echo json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR) . "\n";
                 if (ob_get_level() > 0) {
                     ob_flush();
@@ -187,6 +191,11 @@ final readonly class CommandCenterService
                 array_unshift($tokens, $scriptPath);
             }
             $process = $this->process([$parameters->command, ...$tokens]);
+            if (isset($context['inputValues'])) {
+                $process->setEnv(['COMMAND_CENTER_INPUTS' => json_encode(
+                    (object) $context['inputValues'], JSON_THROW_ON_ERROR,
+                )]);
+            }
             $process->start();
             foreach ($process as $type => $chunk) {
                 $emit(['type' => $type, 'text' => $chunk]);

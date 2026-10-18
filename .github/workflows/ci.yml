@@ -71,6 +71,7 @@ jobs:
       - run: npm run check-translations
       - run: npm run check-types
       - run: npm run check-template-preview
+      - run: npm run check-studio-actions
       - run: npm run check-terminal
       - run: npm run build
 

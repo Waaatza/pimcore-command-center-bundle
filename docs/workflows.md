@@ -89,6 +89,15 @@ the same permissions and backup rules as schedules and history; the files are ne
 At most 100 workflows and 100 queued runs are kept, each run retaining at most 1 MB of output, and
 history has no automatic expiry. Every workflow API (listing, saving, deleting, queueing) and the tab
 itself require Pimcore administrator access and a valid CSRF token; non-administrators cannot queue,
-inspect or delegate workflow steps.
+inspect or change workflow steps through those endpoints. Administrators may separately delegate a stored
+workflow through [Studio action buttons](studio-actions.md), with explicit grants and server-bound inputs.
+
+## Input fields
+
+Workflows can define the same typed input fields as templates. Run now and Schedule ask for required
+values; each step can use `{{fieldName}}` in CLI tokens. All resolved inputs are also JSON in
+`COMMAND_CENTER_INPUTS`, including for inline PHP. PHP source is not interpolated. Values are validated
+before a run is queued or a schedule is created, and stored with the resolved snapshot. Existing workflows
+without fields keep their literal arguments unchanged. See [Studio actions](studio-actions.md#workflow-inputs).
 
 [Back to README](../README.md)

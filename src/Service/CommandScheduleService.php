@@ -110,10 +110,11 @@ final readonly class CommandScheduleService
         if ($workflow === null && $parameters->workflow !== null) {
             $reference = $parameters->workflow;
             if (!is_string($reference['id'] ?? null) || !is_int($reference['revision'] ?? null)
-                || $this->workflows === null || array_diff(array_keys($reference), ['id', 'revision'])) {
+                || (isset($reference['values']) && !is_array($reference['values']))
+                || $this->workflows === null || array_diff(array_keys($reference), ['id', 'revision', 'values'])) {
                 throw new BadRequestHttpException('Invalid workflow reference.');
             }
-            $workflow = $this->workflows->snapshot($reference['id'], $reference['revision']);
+            $workflow = $this->workflows->resolve($reference['id'], $reference['revision'], $reference['values'] ?? []);
         }
         $execution = $parameters->execution;
         if ($workflow !== null) {
