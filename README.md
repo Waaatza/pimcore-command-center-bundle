@@ -9,6 +9,15 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Edit, enable/disable/delete plans and inspect the latest output and status.
 - Administrator access and CSRF protection on mutations.
 
+## Security disclaimer
+
+**Use this bundle at your own risk, especially in production environments.** It allows administrators to
+execute console commands and arbitrary PHP code in your application's environment. Incorrectly configured
+administrator accounts or permissions, compromised accounts, and unsafe commands or scripts can pose
+significant risks to the entire system, including data loss, disclosure of sensitive information and service
+disruption. Grant administrator access only to trusted, qualified users, review commands and scripts before
+execution, and maintain tested backups before using the bundle in production.
+
 ![Pimcore Studio Command Control Center with inline PHP execution](docs/img/studio-command-control-center.png)
 
 ## Tips
