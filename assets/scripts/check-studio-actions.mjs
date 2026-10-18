@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { setImmediate } from 'node:timers/promises'
 import React from 'react'
+import { createColumnHelper } from '@tanstack/react-table'
 import ts from 'typescript'
 
 const root = new URL('../js/src/', import.meta.url)
@@ -242,3 +243,130 @@ for (const placement of ['global', 'object', 'asset', 'document']) {
   }
 }
 console.log('Empty and denied actions hidden at all four placements; focus refresh and server errors checked.')
+
+// Admin-Oberfläche: Tabelle, Leerzustand, Editor-Sections, Save-Feedback und Delete-Bestätigung.
+let adminItems = []
+const adminCalls = []
+const windowEvents = []
+const alertWarnings = []
+const adminCatalog = () => ({
+  items: adminItems,
+  templates: [{ id: 't1', label: 'Template One', fields: [{ name: 'folder', label: 'Folder', type: 'string', required: true }] }],
+  workflows: [{ id: 'w1', label: 'Workflow One' }],
+  users: [{ value: 1, label: 'Admin User' }], roles: [{ value: 2, label: 'Editors' }],
+  classes: [{ value: '12', label: 'Object' }],
+  csrfToken: 'csrf'
+})
+const adminApi = compile('components/command-center/studio-actions-api.ts', {
+  './api': { commandCenterUrl: path => path }
+}, { fetch: async (path, options = {}) => {
+  path = path.replace('actions/', '')
+  const body = options.body === undefined ? undefined : JSON.parse(options.body)
+  adminCalls.push({ path, body })
+  if (path === 'admin') return { ok: true, json: async () => adminCatalog() }
+  if (path === 'save') return { ok: true, json: async () => body }
+  if (path === 'delete') return { ok: true, json: async () => ({}) }
+  throw new Error(`Unexpected admin request: ${path}`)
+} })
+const stubComponent = name => { const fn = () => null; fn.displayName = name; return fn }
+const FormKitStub = stubComponent('FormKit'); FormKitStub.Panel = stubComponent('Panel')
+const FormStub = stubComponent('Form'); FormStub.Item = stubComponent('Item')
+const adminComponents = new Proxy({}, { get: (_, name) => {
+  if (name === 'useAlertModal') return () => ({ warn: props => { alertWarnings.push(props); return {} } })
+  if (name === 'FormKit') return FormKitStub
+  if (name === 'Form') return FormStub
+  return name
+} })
+const adminModule = compile('components/command-center/studio-actions.tsx', {
+  '@pimcore/studio-ui-bundle/app': app,
+  '@pimcore/studio-ui-bundle/components': adminComponents,
+  '@tanstack/react-table': { createColumnHelper },
+  './studio-actions-api': adminApi
+}, { window: { dispatchEvent: event => windowEvents.push(event.type) }, Event })
+const renderAdmin = () => {
+  cursor = 0
+  const internal = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher
+  const previous = internal.current
+  internal.current = dispatcher
+  let tree
+  try { tree = adminModule.StudioActions({ active: true }) } finally { internal.current = previous }
+  const queued = effects; effects = []
+  for (const effect of queued) { const cleanup = effect(); if (cleanup) cleanups.push(cleanup) }
+  return tree
+}
+const labeled = (tree, label) => nodes(tree).find(node => node.props?.label === label)?.props.children
+
+// Lade- und Leerzustand.
+hooks.length = 0; effects = []; cleanups.length = 0; adminCalls.length = 0; windowEvents.length = 0; alertWarnings.length = 0
+adminItems = []
+let adminTree = renderAdmin()
+assert.equal(nodes(adminTree).some(node => node.type === 'Content'), true, 'Admin view skipped its loading state')
+await settle()
+adminTree = renderAdmin()
+assert.equal(nodes(adminTree).some(node => node.type === 'Grid'), true, 'Admin table missing')
+assert.equal(nodes(adminTree).some(node => node.props?.children === 'command-center.actions.empty'), true, 'Empty catalog showed no hint')
+
+// Tabelle mit Zeilendaten, Grants-Zusammenfassung und Speichern einer neuen Aktion.
+adminItems = [{
+  id: 'a1', revision: 1, label: 'Existing', icon: 'play', position: 0, enabled: true,
+  targetType: 'template', targetId: 't1', placements: ['global'], userIds: [1], roleIds: [],
+  objectClasses: [], elementPermission: 'write', direct: false, showOutput: false, bindings: {}
+}]
+hooks.length = 0; effects = []; cleanups.length = 0; adminCalls.length = 0
+renderAdmin(); await settle()
+adminTree = renderAdmin()
+const grid = nodes(adminTree).find(node => node.type === 'Grid')
+assert.equal(grid.props.data.length, 1, 'Admin table lost its rows')
+const cellOf = (tree, id, item) => nodes(tree).find(node => node.type === 'Grid').props.columns
+  .find(column => column.id === id).cell({ row: { original: item } })
+assert.equal(nodes(cellOf(adminTree, 'label', adminItems[0])).some(node => node.type === 'Icon'), true, 'Action label lost its icon')
+assert.equal(nodes(cellOf(adminTree, 'grants', adminItems[0])).some(node => node.type === 'Text' && node.props?.children === 'Admin User'), true, 'Grants column missed the user label')
+assert.equal(nodes(cellOf(adminTree, 'placements', adminItems[0])).some(node => node.type === 'Tag'), true, 'Placements column lost its tags')
+assert.equal(nodes(adminTree).some(node => node.props?.children === 'command-center.actions.empty'), false, 'Empty hint stayed after items arrived')
+
+button(adminTree, 'command-center.actions.new').props.onClick()
+adminTree = renderAdmin()
+assert.equal(nodes(adminTree).some(node => node.type === FormKitStub), true, 'New action did not open the editor')
+assert.equal(button(adminTree, 'command-center.actions.save').props.disabled, true, 'Save was enabled without label, target and placements')
+const blockedHint = treeValue => nodes(treeValue).some(node => node.props?.children === 'command-center.actions.save-blocked')
+assert.equal(blockedHint(adminTree), true, 'Blocked save did not explain why')
+assert.equal(nodes(adminTree).some(node => node.props?.children === 'command-center.actions.warn-grants'), true, 'Missing grants stayed unmarked')
+assert.equal(nodes(adminTree).some(node => node.props?.children === 'command-center.actions.warn-disabled'), true, 'Disabled action stayed unmarked')
+labeled(adminTree, 'command-center.templates.label').props.onChange({ target: { value: 'Fresh' } })
+labeled(adminTree, 'command-center.actions.target').props.onChange('template:t1')
+adminTree = renderAdmin()
+assert.equal(button(adminTree, 'command-center.actions.save').props.disabled, true, 'Save ignored missing placements')
+assert.equal(blockedHint(adminTree), true, 'Partial action lost the blocked hint')
+labeled(adminTree, 'command-center.actions.placements').props.onChange(['object'])
+labeled(adminTree, 'command-center.actions.enabled').props.onChange(true)
+labeled(adminTree, 'command-center.actions.users').props.onChange([1])
+adminTree = renderAdmin()
+const saveButton = button(adminTree, 'command-center.actions.save')
+assert.equal(saveButton.props.disabled, false, 'Valid action could not be saved')
+assert.equal(blockedHint(adminTree), false, 'Valid action still showed the blocked hint')
+assert.equal(nodes(adminTree).some(node => node.props?.children === 'command-center.actions.warn-disabled'), false, 'Enabled action kept the disabled warning')
+assert.equal(nodes(adminTree).some(node => node.props?.children === 'command-center.actions.warn-grants'), false, 'Granted action kept the grants warning')
+saveButton.props.onClick(); await settle()
+const savedCall = adminCalls.find(call => call.path === 'save')
+assert.equal(savedCall.body.label, 'Fresh', 'Save sent the wrong label')
+assert.equal(savedCall.body.csrfToken, 'csrf', 'Save omitted the CSRF token')
+assert.equal(savedCall.body.placements[0], 'object', 'Save lost the placements')
+assert.equal(windowEvents.includes(adminApi.actionsChanged), true, 'Toolbar buttons were not notified')
+await settle()
+adminTree = renderAdmin()
+assert.equal(button(adminTree, 'command-center.actions.save'), undefined, 'Editor stayed open after saving')
+assert.equal(nodes(adminTree).some(node => node.type === 'Alert' && node.props.type === 'success'), true, 'Saving stayed silent')
+
+// Löschen erst nach der Bestätigung, aus der Zeilen-Aktion heraus.
+alertWarnings.length = 0; adminCalls.length = 0
+const rowDelete = nodes(cellOf(adminTree, 'actions', adminItems[0]))
+  .find(node => node.type === 'Button' && node.props.danger === true && node.props.children === 'command-center.ui.delete')
+rowDelete.props.onClick()
+assert.equal(alertWarnings.length, 1, 'Delete ran without confirmation')
+assert.equal(alertWarnings[0].content, 'command-center.actions.delete-confirm', 'Delete confirmation lost its message')
+alertWarnings[0].onOk(); await settle()
+const deleteCall = adminCalls.find(call => call.path === 'delete')
+assert.equal(deleteCall !== undefined, true, 'Confirmed delete did not reach the API')
+assert.equal(deleteCall.body.id, 'a1', 'Delete sent the wrong id')
+for (const cleanup of cleanups) cleanup()
+console.log('Admin listing, empty state, section editor, save feedback and confirmed delete checked.')

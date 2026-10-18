@@ -5,6 +5,10 @@ Administrators configure them under **Command Center → Studio actions**. New a
 no editor grants. The Command Center itself, command definitions, history browser and terminal remain
 administrator-only.
 
+The overview lists every action with its icon, target, placements, grants and status; edit or delete an
+action from its row, or create one with **New action**. The editor groups the settings into sections for
+general setup, placements, grants, input bindings and output; saving reports back above the table.
+
 ![Studio actions](docs/img/studio-actions.png)
 
 ## Configure a button
