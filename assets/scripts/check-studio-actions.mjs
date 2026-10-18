@@ -82,28 +82,35 @@ const dispatcher = {
   }
 }
 const calls = []
-let direct = false
-const dialog = compile('components/command-center/studio-action-dialog.tsx', {
-  '@pimcore/studio-ui-bundle/app': app,
-  '@pimcore/studio-ui-bundle/components': components,
-  './input-fields': { InputFields: 'InputFields' }, './output': { Output: 'Output' },
-  './studio-actions-api': { actionFetch: async (path, body) => {
+let direct = false, runResult
+const api = compile('components/command-center/studio-actions-api.ts', {
+  './api': { commandCenterUrl: path => path }
+}, { fetch: async (path, options) => {
+    path = path.replace('actions/', '')
+    const body = options.body === undefined ? undefined : JSON.parse(options.body)
     calls.push({ path, body })
-    if (path === 'prepare') return { json: async () => ({
+    if (path === 'prepare') return { ok: true, json: async () => ({
       id: 'action', label: 'Approved', targetType: 'template', direct, previewSupported: true,
       fields: [{ name: 'target', label: 'Target', type: 'string', required: true }], bound: []
     }) }
-    if (path === 'preview') return { json: async () => delayedPreview ?? { supported: true, count: 1 } }
+    if (path === 'preview') return { ok: true, json: async () => delayedPreview ?? { supported: true, count: 1 } }
     if (path === 'run') {
+      if (typeof runResult === 'number') return { ok: false, status: runResult }
+      if (runResult === 'network') throw new Error('network')
       let delivered = false
-      return { headers: { get: () => 'application/x-ndjson' }, body: { getReader: () => ({ read: async () => {
+      return { ok: true, status: 200, headers: { get: () => 'application/x-ndjson' }, body: { getReader: () => ({ read: async () => {
         if (delivered) return { done: true }
         delivered = true
         return { done: false, value: new TextEncoder().encode('{"type":"run","id":"own-run"}\n{"type":"exit","code":0}\n') }
       } }) } }
     }
     throw new Error(`Unexpected action request: ${path}`)
-  } }
+} })
+const dialog = compile('components/command-center/studio-action-dialog.tsx', {
+  '@pimcore/studio-ui-bundle/app': app,
+  '@pimcore/studio-ui-bundle/components': components,
+  './input-fields': { InputFields: 'InputFields' }, './output': { Output: 'Output' },
+  './studio-actions-api': api
 })
 const request = { id: 'action', revision: 1, targetRevision: 1, placement: 'object', context: { type: 'object', id: 11 }, csrfToken: 'csrf' }
 const render = () => {
@@ -152,4 +159,31 @@ hooks.length = 0; effects = []; calls.length = 0; cleanups.length = 0; direct = 
 render(); await settle(); render(); await settle(); render()
 assert.equal(calls.filter(call => call.path === 'run').length, 1, 'Direct action started more than once')
 for (const cleanup of cleanups) cleanup()
-console.log('All toolbar slots, element bindings, preview snapshots, status-only results and direct start checked.')
+// Eine klare Ablehnung stellt das Formular wieder her, ein unklarer Netzwerkfehler sperrt den Dialog.
+for (const scenario of [400, 401, 403, 404, 409, 422, 500, 'network']) {
+  hooks.length = 0; effects = []; calls.length = 0; cleanups.length = 0; direct = false; runResult = scenario
+  render(); await settle()
+  field(render()).props.onChange({ target: 'value' })
+  button(render(), 'command-center.templates.preview').props.onClick(); await settle()
+  button(render(), 'command-center.ui.execute').props.onClick(); await settle()
+  tree = render()
+  if (typeof scenario === 'number' && scenario < 500) {
+    assert.equal(field(tree) !== undefined, true, 'Rejected run kept the form locked')
+    assert.equal(button(tree, 'command-center.ui.execute') !== undefined, true, 'Rejected run hid the execute button')
+    assert.equal(nodes(tree).some(node => node.type === 'Alert'), true, 'Rejected run stayed silent')
+    assert.equal(field(tree).props.values.target, 'value', 'Rejected run lost its inputs')
+    field(tree).props.onChange({ target: 'corrected' })
+    runResult = undefined
+    button(render(), 'command-center.templates.preview').props.onClick(); await settle()
+    button(render(), 'command-center.ui.execute').props.onClick(); await settle()
+    assert.equal(calls.filter(call => call.path === 'run').length, 2, 'Corrected inputs could not be submitted again')
+    assert.equal(nodes(render()).some(node => node.props.role === 'status' && node.props.children === 'command-center.history.status.success'), true)
+
+  } else {
+    assert.equal(field(tree), undefined, 'Uncertain failure reopened a possibly running action')
+    assert.equal(button(tree, 'command-center.ui.execute'), undefined, 'Uncertain failure restored the execute button')
+  }
+  for (const cleanup of cleanups) cleanup()
+}
+runResult = undefined
+console.log('All toolbar slots, element bindings, preview snapshots, status-only results, direct start and rejected-run recovery checked.')

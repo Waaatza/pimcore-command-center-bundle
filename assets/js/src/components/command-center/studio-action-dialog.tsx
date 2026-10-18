@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
 import { Alert, Button, Flex, FormKit, Modal, Text } from '@pimcore/studio-ui-bundle/components'
-import { actionFetch, type ActionRequest, type ActionResult, type PreparedAction } from './studio-actions-api'
+import { ActionHttpError, actionFetch, type ActionRequest, type ActionResult, type PreparedAction } from './studio-actions-api'
 import { InputFields } from './input-fields'
 import { Output } from './output'
 
@@ -67,8 +67,12 @@ export const StudioActionDialog = ({ request, onClose }: {
           if (done) break
         }
       }
-    } catch {
-      if (mounted.current) setError(t('command-center.actions.error'))
+    } catch (error) {
+      if (mounted.current) {
+        // Nur bestätigte Ablehnungen erlauben einen neuen Start; Netzwerkfehler können einen laufenden Job betreffen.
+        if (error instanceof ActionHttpError && [400, 401, 403, 404, 409, 422].includes(error.status)) setStarted(false)
+        setError(t('command-center.actions.error'))
+      }
     } finally {
       if (mounted.current) setBusy(false)
     }

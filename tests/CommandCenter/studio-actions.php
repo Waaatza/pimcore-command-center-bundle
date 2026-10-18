@@ -238,8 +238,19 @@ try {
         $security->current = $editor;
         $check($service->prepare($request($read, $args))['bound'][0]['value'] === $element->getFullPath(),
             'Read-only action required save permission or used browser path.');
+        $security->view = true; $security->current = $admin;
+        $redacted = $save(['placements' => [$type], 'objectClasses' => $type === 'object' ? ['Product'] : [],
+            'elementPermission' => 'read', 'bindings' => ['target' => ['source' => 'id']], 'showOutput' => false]);
+        $security->current = $editor;
+        $events = array_map(static fn ($line) => json_decode($line, true), array_filter(explode("\n",
+            $stream($service->run($request($redacted, $args))))));
+        $redactedRun = array_values(array_filter($events, static fn ($event) => $event['type'] === 'run'))[0]['id'];
+        $check($service->result(new StudioActionRequest(runId: $redactedRun))['status'] === 'success',
+            'Editor lost the result of a visible element.');
         $security->view = false;
         $reject(fn () => $service->prepare($request($read, $args)), AccessDeniedHttpException::class);
+        $reject(fn () => $service->result(new StudioActionRequest(runId: $redactedRun)),
+            AccessDeniedHttpException::class);
         $security->view = true; $security->write = true; $security->current = $admin;
     }
     $wrongClass = $save(['placements' => ['object'], 'objectClasses' => ['Other']]);

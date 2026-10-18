@@ -227,12 +227,12 @@ final readonly class StudioActionService
             throw new NotFoundHttpException('Run unavailable.');
         }
         $action = $this->access->load($record['actionId']);
+        $this->access->context($action, $record['actionPlacement'], $record['actionContext']);
         $safe = array_intersect_key($record, array_flip(['id', 'status', 'exitCode', 'durationMs']));
         $safe['steps'] = array_map(static fn (array $step): array => array_intersect_key(
             $step, array_flip(['label', 'status', 'exitCode']),
         ), $record['workflowSteps'] ?? []);
         if ($user->isAdmin() || ($action['showOutput'] && $record['showOutput'])) {
-            $this->access->context($action, $record['actionPlacement'], $record['actionContext']);
             $safe['output'] = $record['output'];
         }
 
