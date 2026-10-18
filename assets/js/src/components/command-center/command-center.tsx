@@ -3,6 +3,8 @@ import { commandCenterUrl } from './api'
 import React, { useEffect, useRef, useState } from 'react'
 import { Button, Content, TextArea, Select, Tabs } from '@pimcore/studio-ui-bundle/components'
 
+import { CommandTemplates } from './command-templates'
+import { RunHistory } from './run-history'
 import { ScheduledCommands, type CommandDraft } from './scheduled-commands'
 
 interface Definition {
@@ -24,6 +26,8 @@ export const CommandCenter = (): React.JSX.Element => {
       <h2>{t('command-center.ui.title')}</h2>
       <Tabs activeKey={ tab } onChange={ setTab } noPadding items={ [
         { key: 'direct', label: t('command-center.tabs.direct'), children: <CommandRunner onDraftChange={ setDraft } /> },
+        { key: 'templates', label: t('command-center.tabs.templates'), children: <CommandTemplates active={tab === 'templates'} draft={draft} /> },
+        { key: 'history', label: t('command-center.tabs.history'), children: <RunHistory active={tab === 'history'} /> },
         { key: 'scheduled', label: t('command-center.tabs.scheduled'), children:
           <ScheduledCommands draft={ draft } active={ tab === 'scheduled' } onEdit={ () => setTab('direct') } /> }
       ] } />

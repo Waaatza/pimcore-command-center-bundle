@@ -7,6 +7,8 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Paste PHP directly for `pimcore:run-script`.
 - Schedule one-time, hourly, daily or weekly executions.
 - Edit, enable/disable/delete plans and inspect the latest output and status.
+- Persistent run history with input/output snapshots, filters and pagination.
+- Reusable command templates with input fields and opt-in read-only object previews.
 - Administrator access and CSRF protection on mutations.
 
 ## Security disclaimer
@@ -24,6 +26,9 @@ execution, and maintain tested backups before using the bundle in production.
 
 See [Tips and script examples](docs/tips.md), including
 [sending a Studio notification to all active users](docs/tips.md#notify-all-active-users).
+
+See [Run history, templates and preview providers](docs/history-and-templates.md) for the new tabs,
+storage details and a preview-provider example.
 
 ## Languages
 
@@ -52,7 +57,7 @@ Until the package is submitted to Packagist, add this GitHub repository to the h
 
 ```sh
 composer config repositories.command-center vcs https://github.com/Waaatza/pimcore-command-center-bundle
-composer require watza/command-center-bundle:^0.1
+composer require watza/command-center-bundle:^0.2
 ```
 
 Register the bundle in `config/bundles.php` if your installation did not register it automatically:
@@ -146,7 +151,7 @@ its absence means no worker has checked the plans yet.
 Plans and latest results are stored outside the public directory in `var/command-center/<environment>/`.
 Preserve/share this directory between web and worker and across deployments, and include it in backups.
 Each job retains at most 1 MB of output, with up to 50 stored plans. Output is refreshed while a scheduled job
-runs. This is a latest-result view, not a full execution history.
+runs. The schedule details show the latest result; the **Run history** tab keeps all new executions independently.
 
 Completed one-time plans can be scheduled again with **Bearbeiten**: choose a future execution and set the status to active. Disabling a running recurring plan prevents
 future runs and lets the current run finish. Running plans cannot be deleted.

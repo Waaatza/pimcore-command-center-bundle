@@ -46,3 +46,8 @@ For automatic alerts on failed scheduled executions, use the schedule's notifica
 see [Failure notifications](../README.md#failure-notifications).
 
 [Back to README](../README.md)
+
+## History and reusable command templates
+
+Use [persistent history and templates](history-and-templates.md) to inspect past executions, create
+parameter forms for repeated tasks, and implement read-only previews of affected objects.

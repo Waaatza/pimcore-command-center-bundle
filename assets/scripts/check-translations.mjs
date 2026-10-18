@@ -44,4 +44,15 @@ for (const filename of fs.readdirSync(`${root}/assets/js/src/components/command-
 for (const status of ['ready', 'running-progress', 'exit', 'interrupted']) {
   if (!en.has(`command-center.status.${status}`)) throw new Error(`Missing execution status: ${status}`)
 }
+for (const [prefix, values] of Object.entries({
+  'history.status': ['all', 'running', 'success', 'failed', 'timed_out', 'interrupted'],
+  'history.source': ['all', 'manual', 'scheduled', 'template', 'background'],
+  history: ['started', 'command', 'source', 'status', 'duration', 'exit', 'details'],
+  'templates.type': ['string', 'integer', 'choice']
+})) {
+  for (const value of values) {
+    const key = `command-center.${prefix}.${value}`
+    if (!en.has(key)) throw new Error(`Missing dynamic UI translation: ${key}`)
+  }
+}
 console.log(`English/German translation parity, interpolation and ${count} UI references checked.`)

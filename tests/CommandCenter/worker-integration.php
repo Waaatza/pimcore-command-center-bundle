@@ -5,6 +5,8 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/bootstrap.php';
 
 use Watza\CommandCenterBundle\Service\CommandScheduleStore;
+use Watza\CommandCenterBundle\Service\CommandHistoryStore;
+use Watza\CommandCenterBundle\Service\PrivateJsonStorage;
 
 if (!in_array('--live-worker', $argv, true)) {
     throw new RuntimeException('Run inside the application container with --live-worker.');
@@ -31,7 +33,15 @@ try {
                 || !str_contains($run['output'], 'scheduled-worker-ok')) {
                 throw new RuntimeException('Worker check failed: ' . json_encode($run));
             }
-            echo "Live scheduled PHP execution passed (exit 0, output persisted).\n";
+            $history = new CommandHistoryStore(new PrivateJsonStorage(
+                $kernel->getProjectDir() . '/var/command-center/' . $kernel->getEnvironment(),
+            ));
+            $record = $history->get($run['historyId'] ?? '');
+            if ($record['status'] !== 'success' || $record['scheduleId'] !== $id
+                || $record['source'] !== 'scheduled' || !str_contains($record['output'], 'scheduled-worker-ok')) {
+                throw new RuntimeException('Scheduled run was not retained in persistent history.');
+            }
+            echo "Live scheduled PHP execution passed (exit 0, output and history persisted).\n";
             $passed = true;
             break;
         }

@@ -45,7 +45,9 @@ final readonly class CommandScheduleRunner
                 $this->commands->execute($parameters, function (array $event) use (
                     $item, &$output, &$exitCode, &$error, &$lastFlush,
                 ): void {
-                    if ($event['type'] === 'exit') {
+                    if ($event['type'] === 'run') {
+                        $this->saveResult($item['id'], ['historyId' => $event['id']]);
+                    } elseif ($event['type'] === 'exit') {
                         $exitCode = $event['code'];
                     } else {
                         $output = substr($output . ($event['text'] ?? ''), -1000000);
@@ -57,7 +59,7 @@ final readonly class CommandScheduleRunner
                         $this->saveResult($item['id'], ['output' => $output]);
                         $lastFlush = microtime(true);
                     }
-                });
+                }, ['source' => 'scheduled', 'scheduleId' => $item['id'], 'scheduleLabel' => $item['label']]);
             } catch (\Throwable $exception) {
                 $error = $exception->getMessage();
                 $output = substr($output . "\n" . $error, -1000000);
