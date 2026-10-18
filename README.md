@@ -151,4 +151,9 @@ own plan afterwards. Run it from a Git checkout or local path installation insid
 COMMAND_CENTER_AUTOLOAD=/path/to/project/vendor/autoload.php php tests/CommandCenter/worker-integration.php --live-worker
 ```
 
+## Inspiration disclaimer
+
+This project was inspired by the [Job Manager available in the Pimcore Store](https://store.pimcore.com/shop/job-manager-213).
+It is an independent implementation and is not affiliated with or endorsed by the Job Manager's authors.
+
 MIT licensed. Pimcore and its Studio SDK retain their own licenses.
