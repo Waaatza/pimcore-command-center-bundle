@@ -16,3 +16,6 @@ services:
 
     Watza\CommandCenterBundle\Webpack\WebpackEntryPointProvider:
         tags: ['pimcore_studio_ui.webpack_entry_point_provider']
+
+    Watza\CommandCenterBundle\Service\FailureNotifierInterface:
+        alias: Watza\CommandCenterBundle\Service\FailureNotificationService

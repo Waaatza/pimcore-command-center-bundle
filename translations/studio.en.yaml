@@ -11,3 +11,5 @@ command_center_createschedule: Schedule a command execution
 command_center_createschedule_success: Schedule created
 command_center_scheduleaction: Enable, disable or delete a schedule
 command_center_scheduleaction_success: Schedule updated
+command_center_schedulenotifications: Configure failure notifications
+command_center_schedulenotifications_success: Notification settings saved

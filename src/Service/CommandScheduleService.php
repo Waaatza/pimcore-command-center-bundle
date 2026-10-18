@@ -12,6 +12,7 @@ use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Watza\CommandCenterBundle\Parameter\CommandScheduleActionParameters;
 use Watza\CommandCenterBundle\Parameter\CommandScheduleParameters;
+use Watza\CommandCenterBundle\Parameter\ScheduleNotificationsParameters;
 
 /** @internal */
 final readonly class CommandScheduleService
@@ -21,6 +22,7 @@ final readonly class CommandScheduleService
         private CommandCenterService $commands,
         private CsrfTokenManagerInterface $csrfTokenManager,
         private SecurityServiceInterface $security,
+        private ScheduleRecipientService $recipients,
     ) {
     }
 
@@ -29,6 +31,7 @@ final readonly class CommandScheduleService
         $heartbeat = $this->store->directory() . '/heartbeat';
 
         return [
+            'recipients' => $this->recipients->list(),
             'lastHeartbeat' => is_file($heartbeat) ? gmdate(DATE_ATOM, filemtime($heartbeat)) : null,
             'schedules' => array_map(static function (array $item): array {
                 unset($item['phpCode'], $item['tokens'], $item['lastRun']['output']);
@@ -53,6 +56,7 @@ final readonly class CommandScheduleService
     {
         $this->checkToken($parameters->execution->csrfToken);
         $this->commands->validate($parameters->execution);
+        $this->recipients->validate($parameters->notificationRecipientIds, $parameters->notificationChannels);
         try {
             $runAt = new \DateTimeImmutable($parameters->runAt);
             new \DateTimeZone($parameters->timezone);
@@ -79,6 +83,8 @@ final readonly class CommandScheduleService
             'enabled' => true,
             'createdAt' => gmdate(DATE_ATOM),
             'createdBy' => $user->getId(),
+            'notificationRecipientIds' => array_values(array_unique($parameters->notificationRecipientIds)),
+            'notificationChannels' => array_values(array_unique($parameters->notificationChannels)),
             'lastRun' => null,
         ];
         $this->store->update(static function (array &$items) use ($item): void {
@@ -109,6 +115,23 @@ final readonly class CommandScheduleService
             } else {
                 throw new BadRequestHttpException('Invalid schedule action.');
             }
+        });
+    }
+
+    public function updateNotifications(ScheduleNotificationsParameters $parameters): void
+    {
+        $this->checkToken($parameters->csrfToken);
+        $this->recipients->validate($parameters->notificationRecipientIds, $parameters->notificationChannels);
+        $this->store->update(static function (array &$items) use ($parameters): void {
+            if (!isset($items[$parameters->id])) {
+                throw new NotFoundHttpException('Schedule not found.');
+            }
+            $items[$parameters->id]['notificationRecipientIds'] = array_values(
+                array_unique($parameters->notificationRecipientIds),
+            );
+            $items[$parameters->id]['notificationChannels'] = array_values(
+                array_unique($parameters->notificationChannels),
+            );
         });
     }
 

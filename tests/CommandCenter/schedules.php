@@ -7,6 +7,7 @@ require dirname(__DIR__) . '/bootstrap.php';
 use Watza\CommandCenterBundle\Service\CommandCenterService;
 use Watza\CommandCenterBundle\Service\CommandScheduleRunner;
 use Watza\CommandCenterBundle\Service\CommandScheduleStore;
+use Watza\CommandCenterBundle\Service\FailureNotifierInterface;
 use Symfony\Component\Security\Csrf\CsrfTokenManager;
 
 $directory = sys_get_temp_dir() . '/command-schedules-' . bin2hex(random_bytes(8));
@@ -24,7 +25,19 @@ exit($argv[1] === 'test:failure' ? 9 : 0);
 CONSOLE);
 $store = new CommandScheduleStore($directory . '/storage');
 $commands = new CommandCenterService(new CsrfTokenManager(), $directory, 'test');
-$runner = new CommandScheduleRunner($store, $commands);
+$notifier = new class implements FailureNotifierInterface {
+    public array $calls = [];
+    public function notify(array $schedule): array
+    {
+        $this->calls[] = $schedule;
+        if ($schedule['id'] === 'failed') {
+            throw new RuntimeException('Test mail transport unavailable');
+        }
+
+        return [['userId' => 1, 'channel' => 'studio', 'status' => 'sent']];
+    }
+};
+$runner = new CommandScheduleRunner($store, $commands, $notifier);
 $check = static function (bool $condition, string $message): void {
     if (!$condition) {
         throw new RuntimeException($message);
@@ -54,6 +67,8 @@ try {
     $check($all['future']['lastRun'] === null && $all['disabled']['lastRun'] === null, 'Inactive job executed');
     $check(session_status() === PHP_SESSION_NONE, 'Background runner unexpectedly opened an HTTP session');
 
+    $check($notifier->calls === [], 'Successful or skipped runs triggered notifications');
+
     $recurring = $make('recurring', 'daily');
     $store->update(static function (array &$items) use ($recurring): void { $items['recurring'] = $recurring; });
     $runner->tick();
@@ -72,6 +87,9 @@ try {
     $check($all['failed']['lastRun']['status'] === 'failed' && $all['failed']['lastRun']['exitCode'] === 9,
         'Non-zero exit code not recorded');
 
+    $check(count($notifier->calls) === 1, 'Failed run did not trigger exactly one notification');
+    $check($all['failed']['lastRun']['notifications'][0]['status'] === 'failed', 'Notification failure not recorded');
+
     $interrupted = $make('interrupted', 'hourly');
     $interrupted['lastRun'] = ['status' => 'running', 'output' => 'partial'];
     $store->update(static function (array &$items) use ($interrupted): void { $items['interrupted'] = $interrupted; });
@@ -79,6 +97,10 @@ try {
     $all = array_column($store->all(), null, 'id');
     $check(!$all['interrupted']['enabled'] && $all['interrupted']['lastRun']['status'] === 'interrupted',
         'Interrupted job was not disabled');
+
+    $check(count($notifier->calls) === 2, 'Interrupted run did not trigger a notification');
+    $runner->tick();
+    $check(count($notifier->calls) === 2, 'Interrupted run triggered repeated notifications');
 
     $locked = $make('locked');
     $store->update(static function (array &$items) use ($locked): void { $items['locked'] = $locked; });

@@ -151,6 +151,25 @@ own plan afterwards. Run it from a Git checkout or local path installation insid
 COMMAND_CENTER_AUTOLOAD=/path/to/project/vendor/autoload.php php tests/CommandCenter/worker-integration.php --live-worker
 ```
 
+## Failure notifications
+
+Choose active Pimcore users and **E-Mail**, **Studio-Benachrichtigung**, or both when creating a schedule.
+For an existing schedule, open **Details** and save its notification settings. Changes apply to subsequent runs;
+leave recipients and channels empty to disable alerts. Existing schedules keep notifications disabled by default.
+
+Failed runs (nonzero exit codes, exceptions and timeouts) and worker-interrupted runs trigger alerts.
+Successful runs do not. Each alert includes the plan, command, execution status and timestamps. PHP source,
+arguments and command output are not included; inspect the full output in the Command Center.
+
+Email uses Pimcore's existing mail configuration, including its sender address and transport. Recipients need
+a valid email address. Studio recipients need the `notifications` permission. Users are checked again at send
+time, so deleted/inactive users and revoked permissions are handled as delivery failures.
+
+Delivery results appear with the latest run's details. A failed mail/notification delivery does not rerun the
+command or prevent other recipients/channels from being processed. Deliveries are attempted once; there is
+no automatic retry. A worker crash during delivery may leave an alert unsent; command execution is never
+replayed to send an alert.
+
 ## Inspiration disclaimer
 
 This project was inspired by the [Job Manager available in the Pimcore Store](https://store.pimcore.com/shop/job-manager-213).

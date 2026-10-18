@@ -5,7 +5,7 @@
     "name": "watza_command_center_bundle",
     "type": "app",
     "buildInfo": {
-      "buildVersion": "0.1.0",
+      "buildVersion": "0.1.1",
       "buildName": "pimcore-command-center-bundle"
     },
     "remoteEntry": {
@@ -21,7 +21,7 @@
     },
     "globalName": "watza_command_center_bundle",
     "pluginVersion": "2.9.2",
-    "publicPath": "/bundles/pimcorecommandcenter/build/4e5e1d98-97e8-442b-ba7d-97d4c5c329e8/"
+    "publicPath": "/bundles/pimcorecommandcenter/build/47ef969a-7f5d-4381-97fd-8481ddc688b4/"
   },
   "shared": [
     {
@@ -106,7 +106,7 @@
       "assets": {
         "js": {
           "sync": [
-            "static/js/async/__federation_expose_default_export.df77962ff2.js"
+            "static/js/async/__federation_expose_default_export.e719fb6bea.js"
           ],
           "async": []
         },

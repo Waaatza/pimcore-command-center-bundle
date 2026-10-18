@@ -20,6 +20,11 @@ final readonly class CommandScheduleParameters
         public string $repeat = 'once',
         #[Assert\Timezone]
         public string $timezone = 'Europe/Berlin',
+        #[Assert\Count(max: 50)]
+        #[Assert\All([new Assert\Type('integer'), new Assert\Positive()])]
+        public array $notificationRecipientIds = [],
+        #[Assert\Choice(choices: ['email', 'studio'], multiple: true)]
+        public array $notificationChannels = [],
     ) {
     }
 }

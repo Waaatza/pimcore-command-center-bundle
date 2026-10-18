@@ -11,3 +11,5 @@ command_center_createschedule: Command-Ausführung planen
 command_center_createschedule_success: Zeitplan erstellt
 command_center_scheduleaction: Zeitplan aktivieren, deaktivieren oder löschen
 command_center_scheduleaction_success: Zeitplan aktualisiert
+command_center_schedulenotifications: Fehlerbenachrichtigungen konfigurieren
+command_center_schedulenotifications_success: Benachrichtigungseinstellungen gespeichert

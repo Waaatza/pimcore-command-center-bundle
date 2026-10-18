@@ -8,7 +8,11 @@ use Watza\CommandCenterBundle\Parameter\CommandRunParameters;
 /** @internal */
 final readonly class CommandScheduleRunner
 {
-    public function __construct(private CommandScheduleStore $store, private CommandCenterService $commands)
+    public function __construct(
+        private CommandScheduleStore $store,
+        private CommandCenterService $commands,
+        private FailureNotifierInterface $notifier,
+    )
     {
     }
 
@@ -24,7 +28,11 @@ final readonly class CommandScheduleRunner
                 return;
             }
             touch($this->store->directory() . '/heartbeat');
-            $item = $this->claim(new \DateTimeImmutable());
+            $interrupted = [];
+            $item = $this->claim(new \DateTimeImmutable(), $interrupted);
+            foreach ($interrupted as $unfinished) {
+                $this->notifyFailure($unfinished);
+            }
             if ($item === null) {
                 return;
             }
@@ -54,21 +62,26 @@ final readonly class CommandScheduleRunner
                 $error = $exception->getMessage();
                 $output = substr($output . "\n" . $error, -1000000);
             }
-            $this->saveResult($item['id'], [
+            $result = [
                 'status' => $error === null && $exitCode === 0 ? 'success' : 'failed',
                 'finishedAt' => gmdate(DATE_ATOM),
                 'exitCode' => $exitCode,
                 'output' => $output,
-            ]);
+            ];
+            $this->saveResult($item['id'], $result);
+            if ($result['status'] === 'failed') {
+                $item['lastRun'] = array_replace($item['lastRun'], $result);
+                $this->notifyFailure($item);
+            }
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);
         }
     }
 
-    private function claim(\DateTimeImmutable $now): ?array
+    private function claim(\DateTimeImmutable $now, array &$interrupted): ?array
     {
-        return $this->store->update(static function (array &$items) use ($now): ?array {
+        return $this->store->update(static function (array &$items) use ($now, &$interrupted): ?array {
             // No other runner holds runner.lock: any leftover running job was interrupted.
             // Never retry it automatically, as it may already have caused side effects.
             foreach ($items as &$item) {
@@ -77,6 +90,7 @@ final readonly class CommandScheduleRunner
                     $item['lastRun']['status'] = 'interrupted';
                     $item['lastRun']['finishedAt'] = $now->format(DATE_ATOM);
                     $item['lastRun']['output'] .= "\nWorker interrupted. Schedule disabled; check before rescheduling.";
+                    $interrupted[] = $item;
                 }
             }
             unset($item);
@@ -130,6 +144,16 @@ final readonly class CommandScheduleRunner
         } while ($next <= $now);
 
         return $next->setTimezone(new \DateTimeZone('UTC'))->format(DATE_ATOM);
+    }
+
+    private function notifyFailure(array $item): void
+    {
+        try {
+            $results = $this->notifier->notify($item);
+        } catch (\Throwable $exception) {
+            $results = [['status' => 'failed', 'error' => $exception->getMessage()]];
+        }
+        $this->saveResult($item['id'], ['notifications' => $results]);
     }
 
     private function saveResult(string $id, array $result): void

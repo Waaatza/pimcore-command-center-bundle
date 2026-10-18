@@ -16,6 +16,7 @@ $serializer = new Serializer([
 ], [new JsonEncoder()]);
 $payload = json_encode([
     'label' => 'Test plan', 'runAt' => '2030-01-01T12:00:00Z', 'repeat' => 'daily', 'timezone' => 'Europe/Berlin',
+    'notificationRecipientIds' => [1, 2], 'notificationChannels' => ['email', 'studio'],
     'execution' => ['command' => 'pimcore:run-script', 'csrfToken' => 'test', 'tokens' => [], 'phpCode' => 'echo 1;'],
 ]);
 $dto = $serializer->deserialize($payload, CommandScheduleParameters::class, 'json');
@@ -31,5 +32,13 @@ $invalid = new CommandScheduleParameters(
 );
 if (count($validator->validate($invalid)) === 0) {
     throw new RuntimeException('Nested validation did not reject missing CSRF token.');
+}
+$badRecipients = new CommandScheduleParameters(notificationRecipientIds: ['1']);
+if (count($validator->validate($badRecipients)) === 0) {
+    throw new RuntimeException('Non-integer recipient ID accepted.');
+}
+$badChannels = new CommandScheduleParameters(notificationChannels: ['sms']);
+if (count($validator->validate($badChannels)) === 0) {
+    throw new RuntimeException('Unknown delivery channel accepted.');
 }
 echo "Schedule payload and validation checks passed.\n";

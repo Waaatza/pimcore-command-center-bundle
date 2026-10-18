@@ -36,7 +36,8 @@
     "test": [
       "@php tests/CommandCenter/smoke.php",
       "@php tests/CommandCenter/schedules.php",
-      "@php tests/CommandCenter/parameters.php"
+      "@php tests/CommandCenter/parameters.php",
+      "@php tests/CommandCenter/notifications.php"
     ]
   }
 }

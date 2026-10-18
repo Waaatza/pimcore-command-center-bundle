@@ -9,11 +9,14 @@ export interface CommandDraft {
   csrfToken: string
 }
 
+interface Recipient { id: number, name: string, email: string | null, studioAllowed: boolean }
+interface Delivery { userId?: number, channel?: string, status: string, error?: string }
 interface RunResult {
   status: 'running' | 'success' | 'failed' | 'interrupted'
   startedAt: string
   finishedAt: string | null
   exitCode: number | null
+  notifications?: Delivery[]
   output?: string
 }
 interface PlannedCommand {
@@ -26,6 +29,8 @@ interface PlannedCommand {
   timezone: string
   nextRunAt: string | null
   enabled: boolean
+  notificationRecipientIds?: number[]
+  notificationChannels?: string[]
   lastRun: RunResult | null
 }
 
@@ -38,6 +43,9 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
   active: boolean
   onEdit: () => void
 }): React.JSX.Element => {
+  const [recipients, setRecipients] = useState<Recipient[]>([])
+  const [recipientIds, setRecipientIds] = useState<number[]>([])
+  const [channels, setChannels] = useState<string[]>([])
   const [items, setItems] = useState<PlannedCommand[]>([])
   const [detail, setDetail] = useState<PlannedCommand>()
   const [selectedId, setSelectedId] = useState<string>()
@@ -61,9 +69,10 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
           signal: abort.signal, cache: 'no-store'
         })
         if (!response.ok) throw new Error(`Zeitpläne konnten nicht geladen werden (${response.status}).`)
-        const data = await response.json() as { schedules: PlannedCommand[], lastHeartbeat: string | null }
+        const data = await response.json() as { schedules: PlannedCommand[], lastHeartbeat: string | null, recipients: Recipient[] }
         if (abort.signal.aborted) return
         setItems(data.schedules)
+        setRecipients(data.recipients)
         setHeartbeat(data.lastHeartbeat)
         if (selectedId !== undefined) {
           const result = await fetch(commandCenterUrl(`schedules/${selectedId}`), {
@@ -99,6 +108,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           label, runAt: new Date(runAt).toISOString(), repeat, timezone,
+          notificationRecipientIds: recipientIds, notificationChannels: channels,
           execution: { ...draft, tokens }
         })
       })
@@ -146,6 +156,8 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
         <Select id="schedule-repeat" value={ repeat } style={ { width: '100%', maxWidth: 'none' } }
           options={ Object.entries(repeatLabels).map(([value, label]) => ({ value, label })) }
           onChange={ (value: string) => setRepeat(value) } />
+        <NotificationFields recipients={ recipients } ids={ recipientIds } channels={ channels }
+          onIds={ setRecipientIds } onChannels={ setChannels } />
         <div><Button type="primary" disabled={ busy || draft.command === undefined || draft.csrfToken === '' || label.trim() === '' || runAt === '' }
           onClick={ () => { void create() } }>Zeitplan speichern</Button></div>
       </fieldset>
@@ -182,6 +194,14 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
       {detail !== undefined && (
         <section>
           <h3>{detail.label}</h3>
+          <NotificationEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
+            onSaved={ () => setRevision(value => value + 1) } />
+          {detail.lastRun?.notifications !== undefined && detail.lastRun.notifications.length > 0 && (
+            <ul>{detail.lastRun.notifications.map((delivery, index) => (
+              <li key={ index }>{delivery.channel === 'email' ? 'E-Mail' : 'Studio'} · Nutzer {delivery.userId ?? '—'}:
+                {delivery.status === 'sent' ? ' versendet' : ` Versand fehlgeschlagen: ${delivery.error ?? ''}`}</li>
+            ))}</ul>
+          )}
           <p>Letzter Start: {formatDate(detail.lastRun?.startedAt ?? null)} · Ende: {formatDate(detail.lastRun?.finishedAt ?? null)}</p>
           <details><summary>Gespeicherte Parameter und PHP-Code</summary>
             <pre style={ { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }>{JSON.stringify(detail.tokens)}{'\n'}{detail.phpCode}</pre>
@@ -193,5 +213,57 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
         </section>
       )}
     </div>
+  )
+}
+
+
+const NotificationFields = ({ recipients, ids, channels, onIds, onChannels }: {
+  recipients: Recipient[], ids: number[], channels: string[],
+  onIds: (ids: number[]) => void, onChannels: (channels: string[]) => void
+}): React.JSX.Element => (
+  <>
+    <label>Bei Fehlern benachrichtigen</label>
+    <Select mode="multiple" aria-label="Empfänger für Fehlerbenachrichtigungen" value={ ids }
+      placeholder="Keine Benachrichtigung" style={ { width: '100%', maxWidth: 'none' } }
+      optionFilterProp="label" onChange={ onIds }
+      options={ recipients.map(user => ({ value: user.id,
+        label: `${user.name}${user.email ? ` (${user.email})` : ' (ohne E-Mail)'}${user.studioAllowed ? '' : ' · keine Studio-Benachrichtigungen'}` })) } />
+    <Select mode="multiple" aria-label="Benachrichtigungskanäle" value={ channels }
+      placeholder="Kanäle auswählen" style={ { width: '100%', maxWidth: 'none' } } onChange={ onChannels }
+      options={ [{ value: 'email', label: 'E-Mail' }, { value: 'studio', label: 'Studio-Benachrichtigung' }] } />
+    <small>E-Mail benötigt einen konfigurierten Mailversand und eine gültige Nutzeradresse.
+      Studio-Benachrichtigungen benötigen die Berechtigung „notifications“.</small>
+  </>
+)
+
+const NotificationEditor = ({ item, recipients, csrfToken, onSaved }: {
+  item: PlannedCommand, recipients: Recipient[], csrfToken: string, onSaved: () => void
+}): React.JSX.Element => {
+  const [ids, setIds] = useState(item.notificationRecipientIds ?? [])
+  const [channels, setChannels] = useState(item.notificationChannels ?? [])
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const save = async (): Promise<void> => {
+    setBusy(true)
+    setMessage('')
+    try {
+      const response = await fetch(commandCenterUrl('schedules/notifications'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, csrfToken, notificationRecipientIds: ids, notificationChannels: channels })
+      })
+      if (!response.ok) throw new Error(`Speichern fehlgeschlagen (${response.status}): ${await response.text()}`)
+      setMessage('Benachrichtigungen gespeichert. Änderungen gelten ab der nächsten Ausführung.')
+      onSaved()
+    } catch (reason) { setMessage(reason instanceof Error ? reason.message : String(reason)) }
+    finally { setBusy(false) }
+  }
+  return (
+    <fieldset style={ { display: 'flex', flexDirection: 'column', gap: 12, padding: 16, border: '1px solid #8886' } }>
+      <legend>Fehlerbenachrichtigungen</legend>
+      <NotificationFields recipients={ recipients } ids={ ids } channels={ channels }
+        onIds={ setIds } onChannels={ setChannels } />
+      <div><Button disabled={ busy } onClick={ () => { void save() } }>Benachrichtigungen speichern</Button></div>
+      {message !== '' && <div role="status">{message}</div>}
+    </fieldset>
   )
 }
