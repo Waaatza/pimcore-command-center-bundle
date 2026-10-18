@@ -147,7 +147,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
   return (
     <div style={ { display: 'flex', flexDirection: 'column', gap: 16 } }>
       <p>{t('command-center.ui.schedule-help')}</p>
-      <small>{t('command-center.ui.worker', { date: heartbeat === null ? t('command-center.ui.no-heartbeat') : formatDate(heartbeat) })}</small>
+      <small>{t('command-center.ui.worker', { date: heartbeat === null ? t('command-center.ui.no-heartbeat') : formatDate(heartbeat), interpolation: { escapeValue: false } })}</small>
       <fieldset style={ { display: 'flex', flexDirection: 'column', gap: 12, padding: 16, border: '1px solid #8886' } }>
         <legend>{t('command-center.ui.new-schedule')}</legend>
         <div>{t('command-center.ui.command')}: <strong>{draft.command ?? t('command-center.ui.none-selected')}</strong>{draft.phpCode !== null && t('command-center.ui.with-php')}
@@ -156,7 +156,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
         <small>{t('command-center.ui.draft-help')}</small>
         <label htmlFor="schedule-label">{t('command-center.ui.name')}</label>
         <Input id="schedule-label" value={ label } maxLength={ 120 } onChange={ event => setLabel(event.target.value) } />
-        <label htmlFor="schedule-run-at">{t('command-center.ui.first-at', { timezone })}</label>
+        <label htmlFor="schedule-run-at">{t('command-center.ui.first-at', { timezone, interpolation: { escapeValue: false } })}</label>
         <Input id="schedule-run-at" type="datetime-local" value={ runAt } onChange={ event => setRunAt(event.target.value) } />
         <label htmlFor="schedule-repeat">{t('command-center.ui.repeat')}</label>
         <Select id="schedule-repeat" value={ repeat } style={ { width: '100%', maxWidth: 'none' } }
@@ -220,7 +220,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
                 {delivery.status === 'sent' ? t('command-center.notify.sent') : t('command-center.notify.failed', { error: delivery.error ?? '' })}</li>
             ))}</ul>
           )}
-          <p>{t('command-center.ui.last-times', { start: formatDate(detail.lastRun?.startedAt ?? null), end: formatDate(detail.lastRun?.finishedAt ?? null) })}</p>
+          <p>{t('command-center.ui.last-times', { start: formatDate(detail.lastRun?.startedAt ?? null), end: formatDate(detail.lastRun?.finishedAt ?? null), interpolation: { escapeValue: false } })}</p>
           <details><summary>{t('command-center.ui.saved-parameters')}</summary>
             <pre style={ { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }>{JSON.stringify(detail.tokens)}{'\n'}{detail.phpCode}</pre>
           </details>
