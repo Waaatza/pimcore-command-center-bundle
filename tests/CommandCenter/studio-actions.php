@@ -168,6 +168,19 @@ try {
     $reject(fn () => $save(['direct' => true]), BadRequestHttpException::class);
     $reject(fn () => $save(['roleIds' => [999]]), BadRequestHttpException::class);
     $reject(fn () => $save(['userIds' => ['2']]), BadRequestHttpException::class);
+    $check($default['iconType'] === 'name' && $default['icon'] === 'play', 'Legacy icon default changed.');
+    foreach (['/bundles/example/icon.svg', 'https://example.com/icon.svg'] as $path) {
+        $customIcon = $save(['iconType' => 'path', 'icon' => $path]);
+        $check($customIcon['icon'] === $path && $customIcon['iconType'] === 'path', 'Custom icon not persisted.');
+        $check($service->prepare($request($customIcon))['iconType'] === 'path', 'Icon type missing in metadata.');
+        $service->delete($request($customIcon));
+    }
+    foreach (['javascript:alert(1)', 'data:image/svg+xml,test', '//example.com/icon.svg', '/bad path.svg', "/bad\0.svg"] as $path) {
+        $reject(fn () => $save(['iconType' => 'path', 'icon' => $path]), BadRequestHttpException::class);
+    }
+    $reject(fn () => $save(['iconType' => 'other']), BadRequestHttpException::class);
+    $reject(fn () => $save(['icon' => '/bundles/example/icon.svg']), BadRequestHttpException::class);
+    $reject(fn () => $save(['iconType' => 'path', 'icon' => '/' . str_repeat('a', 2048)]), BadRequestHttpException::class);
     $action = $save();
     $security->current = $editor;
     $reject($save, AccessDeniedHttpException::class);

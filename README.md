@@ -172,6 +172,7 @@ heartbeat and locking details.
 Configure individual template/workflow buttons in **Command Center → Studio actions**. Place them in the
 left Studio rail or object, asset and document toolbars. Grant users/roles access, bind element values on
 the server and choose confirmation/output policies. New buttons are disabled and admin-only by default.
+Choose icons with the native Studio icon picker, including custom icon paths.
 Workflows also support typed input fields, CLI placeholders and JSON inputs for inline PHP steps.
 
 See [Studio action buttons](docs/studio-actions.md) for setup, permissions, examples and execution behaviour.

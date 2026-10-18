@@ -252,7 +252,7 @@ command-center.actions.help: "Configure approved actions for Studio toolbars. Th
 command-center.actions.choose: "Choose an action"
 command-center.actions.new: "New action"
 command-center.actions.target: "Template or workflow"
-command-center.actions.icon: "Studio icon name"
+command-center.actions.icon: "Icon"
 command-center.actions.position: "Order"
 command-center.actions.placements: "Placement"
 command-center.actions.users: "Allowed users"

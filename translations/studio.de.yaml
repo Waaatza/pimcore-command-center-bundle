@@ -252,7 +252,7 @@ command-center.actions.help: "Freigegebene Aktionen für Studio-Toolbars konfigu
 command-center.actions.choose: "Aktion auswählen"
 command-center.actions.new: "Neue Aktion"
 command-center.actions.target: "Template oder Workflow"
-command-center.actions.icon: "Studio-Iconname"
+command-center.actions.icon: "Icon"
 command-center.actions.position: "Reihenfolge"
 command-center.actions.placements: "Platzierung"
 command-center.actions.users: "Freigegebene Nutzer"

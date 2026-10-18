@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Button, Flex, Form, FormKit, Input, Modal, Select, Switch, Text } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Button, Flex, Form, FormKit, IconSelector, Input, Modal, Select, Switch, Text } from '@pimcore/studio-ui-bundle/components'
 import { actionFetch, actionsChanged, type ActionPlacement } from './studio-actions-api'
 import type { InputField } from './input-fields'
 
@@ -10,6 +10,7 @@ interface ActionDefinition {
   revision?: number
   label: string
   icon: string
+  iconType?: 'name' | 'path'
   position: number
   enabled: boolean
   targetType: 'template' | 'workflow'
@@ -97,7 +98,8 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
           }} />
       </Form.Item>
       <Form.Item label={t('command-center.actions.icon')}>
-        <Input value={editor.icon} maxLength={80} onChange={event => patch({ icon: event.target.value })} />
+        <IconSelector value={{ type: editor.iconType ?? 'name', value: editor.icon }}
+          onChange={icon => patch({ icon: icon?.value ?? 'play', iconType: icon?.type === 'path' ? 'path' : 'name' })} />
       </Form.Item>
       <Form.Item label={t('command-center.actions.position')}>
         <Input type="number" value={editor.position} onChange={event => patch({ position: Number(event.target.value) })} />

@@ -13,7 +13,7 @@ final readonly class StudioActionSaveParameters
         public ?string $id = null,
         public ?int $revision = null,
         #[Assert\Length(max: 120)] public string $label = '',
-        #[Assert\Length(max: 80)] public string $icon = 'play',
+        #[Assert\Length(max: 2048)] public string $icon = 'play',
         public int $position = 0,
         public bool $enabled = false,
         #[Assert\Choice(['template', 'workflow'])] public string $targetType = 'template',
@@ -26,6 +26,7 @@ final readonly class StudioActionSaveParameters
         public bool $direct = false,
         public bool $showOutput = false,
         #[Assert\Count(max: 30)] public array $bindings = [],
+        #[Assert\Choice(['name', 'path'])] public string $iconType = 'name',
     ) {
     }
 }

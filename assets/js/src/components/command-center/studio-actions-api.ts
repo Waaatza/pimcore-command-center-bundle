@@ -9,6 +9,7 @@ export interface ActionMeta {
   targetRevision: number
   label: string
   icon: string
+  iconType?: 'name' | 'path'
   position: number
   direct: boolean
   showOutput: boolean

@@ -8,8 +8,9 @@ administrator-only.
 ## Configure a button
 
 1. Create a template or workflow first. Define any input fields it needs.
-2. Create a Studio action, choose that target, and give the button a label and an existing Studio icon name
-   (for example `play`). Set its order and one or more placements.
+2. Create a Studio action, choose that target, and give the button a label and select an icon with the native
+   Studio icon picker. Built-in icons and custom root-relative paths or HTTP(S) URLs are supported.
+   Clearing the selection restores the default `play` icon. Set its order and one or more placements.
 3. Select individual active users and/or existing Pimcore roles. Grants are combined: either a selected user
    or one of their roles is sufficient. Administrators have access without an explicit grant.
 4. Optionally restrict object buttons to specific classes. An empty class selection allows all object classes.

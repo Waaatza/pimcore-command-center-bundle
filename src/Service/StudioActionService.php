@@ -66,7 +66,11 @@ final readonly class StudioActionService
             if (!is_string($placement)) throw new BadRequestHttpException('Invalid placement.');
         }
         if (trim($parameters->label) === '' || strlen($parameters->label) > 120
-            || !preg_match('/^[a-zA-Z0-9_-]{1,80}$/D', $parameters->icon)
+            || !in_array($parameters->iconType, ['name', 'path'], true)
+            || strlen($parameters->icon) > 2048
+            || !preg_match($parameters->iconType === 'path'
+                ? '~^(?:/(?!/)|https?://)[^\s<>"\x00-\x1f]+$~D'
+                : '/^[a-zA-Z0-9_-]{1,80}$/D', $parameters->icon)
             || !in_array($parameters->elementPermission, ['read', 'write'], true)
             || !array_is_list($parameters->placements) || $parameters->placements === []
             || count($parameters->placements) > 4
@@ -249,7 +253,7 @@ final readonly class StudioActionService
     private function metadata(array $action, array $target): array
     {
         return array_intersect_key($action, array_flip([
-            'id', 'revision', 'label', 'icon', 'position', 'direct', 'showOutput', 'targetType',
+            'id', 'revision', 'label', 'icon', 'iconType', 'position', 'direct', 'showOutput', 'targetType',
         ])) + [
             'targetRevision' => $target['revision'],
             'previewSupported' => $action['targetType'] === 'template'

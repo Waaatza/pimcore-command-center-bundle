@@ -45,9 +45,9 @@ export const StudioActionButtons = ({ placement, context = null }: {
     <Flex vertical={placement === 'global'} gap={8} wrap>
       {error && <Alert type="error" message={t('command-center.actions.error')} />}
       {items.map(action => placement === 'global'
-        ? <IconButton key={action.id} icon={{ value: action.icon }} aria-label={action.label}
+        ? <IconButton key={action.id} icon={{ value: action.icon, type: action.iconType ?? 'name' }} aria-label={action.label}
             tooltip={{ title: action.label }} onClick={() => choose(action)} />
-        : <Button key={action.id} icon={<Icon value={action.icon} />} onClick={() => choose(action)}>{action.label}</Button>)}
+        : <Button key={action.id} icon={<Icon value={action.icon} type={action.iconType ?? 'name'} />} onClick={() => choose(action)}>{action.label}</Button>)}
     </Flex>
     {request !== undefined && <StudioActionDialog request={request} onClose={() => setRequest(undefined)} />}
   </>
