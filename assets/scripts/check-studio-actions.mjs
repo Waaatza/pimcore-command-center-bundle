@@ -40,14 +40,15 @@ assert.deepEqual(slots.map(item => item.slot), [
 
 const app = { useTranslation: () => ({ t: key => key }) }
 const components = new Proxy({}, { get: (_, name) => name })
-const wrappers = compile('components/command-center/studio-action-buttons.tsx', {
+const buttonImports = {
   '@pimcore/studio-ui-bundle/app': app,
   '@pimcore/studio-ui-bundle/components': components,
   '@pimcore/studio-ui-bundle/modules/data-object': { useDataObject: () => ({ id: 11 }) },
   '@pimcore/studio-ui-bundle/modules/asset': { useAsset: () => ({ id: 12 }) },
   '@pimcore/studio-ui-bundle/modules/document': { useDocument: () => ({ id: 13 }) },
   './studio-actions-api': {}, './studio-action-dialog': {}
-})
+}
+const wrappers = compile('components/command-center/studio-action-buttons.tsx', buttonImports)
 for (const [component, type, id] of [
   ['ObjectActionButtons', 'object', 11], ['AssetActionButtons', 'asset', 12], ['DocumentActionButtons', 'document', 13]
 ]) {
@@ -187,3 +188,54 @@ for (const scenario of [400, 401, 403, 404, 409, 422, 500, 'network']) {
 }
 runResult = undefined
 console.log('All toolbar slots, element bindings, preview snapshots, status-only results, direct start and rejected-run recovery checked.')
+
+// Keep permissions in the backend; render no buttons or warning for unavailable actions.
+let availableItems = [], availableStatus = 200
+const buttonApi = compile('components/command-center/studio-actions-api.ts', {
+  './api': { commandCenterUrl: path => path }
+}, { fetch: async () => ({
+  ok: availableStatus === 200, status: availableStatus,
+  json: async () => ({ items: availableItems, csrfToken: 'csrf' })
+}) })
+const listeners = new Map()
+const buttonModule = compile('components/command-center/studio-action-buttons.tsx', {
+  ...buttonImports, './studio-actions-api': buttonApi
+}, { window: {
+  addEventListener: (name, callback) => listeners.set(name, callback),
+  removeEventListener: name => listeners.delete(name)
+} })
+const renderButtons = placement => {
+  cursor = 0
+  const internal = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher
+  const previous = internal.current
+  internal.current = dispatcher
+  let tree
+  try {
+    tree = buttonModule.StudioActionButtons({ placement, context: placement === 'global' ? null : { type: placement, id: 11 } })
+  } finally { internal.current = previous }
+  const queued = effects; effects = []
+  for (const effect of queued) { const cleanup = effect(); if (cleanup) cleanups.push(cleanup) }
+  return tree
+}
+for (const placement of ['global', 'object', 'asset', 'document']) {
+  for (const status of [200, 401, 403, 500]) {
+    hooks.length = 0; effects = []; cleanups.length = 0
+    availableItems = []; availableStatus = status
+    assert.equal(renderButtons(placement), null, 'Buttons flashed before availability was known')
+    await settle()
+    if (status === 500) {
+      assert.notEqual(renderButtons(placement), null, 'Server error was hidden as a permission denial')
+    } else {
+      assert.equal(renderButtons(placement), null, 'Unavailable actions left a container or warning')
+      availableStatus = 200
+      availableItems = [{ id: 'allowed', label: 'Allowed', icon: 'play', revision: 1, targetRevision: 1 }]
+      listeners.get('focus')(); await settle()
+      assert.equal(nodes(renderButtons(placement)).filter(node => node.type === (placement === 'global' ? 'IconButton' : 'Button')).length, 1)
+      availableItems = []
+      listeners.get('focus')(); await settle()
+      assert.equal(renderButtons(placement), null, 'Revoked actions remained visible after refresh')
+    }
+    for (const cleanup of cleanups) cleanup()
+  }
+}
+console.log('Empty and denied actions hidden at all four placements; focus refresh and server errors checked.')

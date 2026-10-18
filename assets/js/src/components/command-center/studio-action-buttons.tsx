@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Button, Flex, Icon, IconButton } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Button, Flex, Icon, IconButton, Tooltip } from '@pimcore/studio-ui-bundle/components'
 import { useDataObject } from '@pimcore/studio-ui-bundle/modules/data-object'
 import { useAsset } from '@pimcore/studio-ui-bundle/modules/asset'
 import { useDocument } from '@pimcore/studio-ui-bundle/modules/document'
-import { actionFetch, actionsChanged, type ActionContext, type ActionMeta, type ActionPlacement, type ActionRequest } from './studio-actions-api'
+import { ActionHttpError, actionFetch, actionsChanged, type ActionContext, type ActionMeta, type ActionPlacement, type ActionRequest } from './studio-actions-api'
 import { StudioActionDialog } from './studio-action-dialog'
 
 export const StudioActionButtons = ({ placement, context = null }: {
   placement: ActionPlacement, context?: ActionContext | null
-}): React.JSX.Element => {
+}): React.JSX.Element | null => {
   const { t } = useTranslation()
   const [items, setItems] = useState<ActionMeta[]>([])
   const [csrfToken, setCsrfToken] = useState('')
@@ -26,7 +26,12 @@ export const StudioActionButtons = ({ placement, context = null }: {
       void actionFetch('available', { placement, context }, abort.signal).then(async response => {
         const data = await response.json() as { items: ActionMeta[], csrfToken: string }
         if (!current.signal.aborted) { setItems(data.items); setCsrfToken(data.csrfToken); setError(false) }
-      }).catch(() => { if (!current.signal.aborted) { setItems([]); setError(true) } })
+      }).catch((error: unknown) => {
+        if (!current.signal.aborted) {
+          setItems([])
+          setError(!(error instanceof ActionHttpError && [401, 403].includes(error.status)))
+        }
+      })
     }
     load()
     window.addEventListener('focus', load)
@@ -41,12 +46,19 @@ export const StudioActionButtons = ({ placement, context = null }: {
   const choose = (action: ActionMeta): void => setRequest({
     csrfToken, id: action.id, revision: action.revision, targetRevision: action.targetRevision, placement, context
   })
+  if (items.length === 0 && !error && request === undefined) return null
+
   return <>
-    <Flex vertical={placement === 'global'} gap={8} wrap>
-      {error && <Alert type="error" message={t('command-center.actions.error')} />}
+    <Flex vertical={placement === 'global'} align={placement === 'global' ? 'center' : undefined}
+      gap={placement === 'global' ? 0 : 8} wrap={placement !== 'global'}>
+      {error && (placement === 'global'
+        ? <Tooltip title={t('command-center.actions.error')} placement="right">
+            <span role="alert" aria-label={t('command-center.actions.error')}><Icon value="warning-circle" /></span>
+          </Tooltip>
+        : <Alert type="error" message={t('command-center.actions.error')} />)}
       {items.map(action => placement === 'global'
         ? <IconButton key={action.id} icon={{ value: action.icon, type: action.iconType ?? 'name' }} aria-label={action.label}
-            tooltip={{ title: action.label }} onClick={() => choose(action)} />
+            type="text" tooltip={{ title: action.label, placement: 'right' }} onClick={() => choose(action)} />
         : <Button key={action.id} icon={<Icon value={action.icon} type={action.iconType ?? 'name'} />} onClick={() => choose(action)}>{action.label}</Button>)}
     </Flex>
     {request !== undefined && <StudioActionDialog request={request} onClose={() => setRequest(undefined)} />}
