@@ -73,6 +73,11 @@ implement `CommandPreviewProviderInterface` and return a `CommandPreviewResult`.
 never call `save()`, `delete()`, execute the command, send messages or perform other side effects. Share the
 selection/transformation logic with your command so the preview matches the real operation.
 
+Commands execute in a separate CLI process. In long-running web workers, cached Pimcore object instances can
+still contain values from before that execution. Preview providers must read the current data, for example
+by loading listing IDs and resolving each object with `getById($id, ['force' => true])` through an injected
+Pimcore data-object resolver. Creating a new listing alone does not bypass the object cache.
+
 ```php
 namespace App\Service;
 
