@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Button, Collapse, Flex, Grid, SearchInput, Select, Tag, Text, Title } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Button, Collapse, Content, Flex, Grid, Modal, SearchInput, Select, Tag, Text, Title } from '@pimcore/studio-ui-bundle/components'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { WorkflowRunView, statusColor } from './workflow-run'
 import { Output } from './output'
@@ -41,6 +41,7 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
   const [selected, setSelected] = useState<string>()
   const [detail, setDetail] = useState<Run>()
   const [error, setError] = useState('')
+  const [detailError, setDetailError] = useState('')
   const [refresh, setRefresh] = useState(0)
   useEffect(() => {
     if (!active) return
@@ -53,12 +54,6 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
         const data = await response.json() as { items: Run[], total: number }
         if (abort.signal.aborted) return
         setItems(data.items); setTotal(data.total)
-        if (selected !== undefined) {
-          const result = await fetch(commandCenterUrl(`history/${selected}`), { signal: abort.signal })
-          if (!result.ok) throw new Error(`${result.status}: ${await result.text()}`)
-          const run = await result.json() as Run
-          if (!abort.signal.aborted) setDetail(run)
-        }
         setError('')
       } catch (reason) {
         if (!abort.signal.aborted) setError(String(reason))
@@ -67,7 +62,26 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
     void load()
     const interval = window.setInterval(() => { void load() }, 5000)
     return () => { abort.abort(); window.clearInterval(interval) }
-  }, [active, page, status, source, search, selected, refresh])
+  }, [active, page, status, source, search, refresh])
+  useEffect(() => {
+    if (!active || selected === undefined) return
+    const abort = new AbortController()
+    setDetail(undefined); setDetailError('')
+    const load = async (): Promise<void> => {
+      try {
+        const response = await fetch(commandCenterUrl(`history/${selected}`), { signal: abort.signal })
+        if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`)
+        const run = await response.json() as Run
+        if (!abort.signal.aborted) { setDetail(run); setDetailError('') }
+      } catch (reason) {
+        if (!abort.signal.aborted) setDetailError(String(reason))
+      }
+    }
+    void load()
+    const interval = window.setInterval(() => { void load() }, 5000)
+    return () => { abort.abort(); window.clearInterval(interval) }
+  }, [active, selected, refresh])
+  const closeDetail = (): void => { setSelected(undefined); setDetail(undefined) }
   const date = (value: string | null): string => value === null ? '—' : new Date(value).toLocaleString(i18n.language)
   const columns: ColumnDef<any, any>[] = [
     columnHelper.accessor(row => date(row.startedAt ?? row.createdAt ?? null), {
@@ -122,8 +136,11 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
       <Text>{page} / {Math.max(1, Math.ceil(total / 25))} ({total})</Text>
       <Button disabled={page * 25 >= total} onClick={() => setPage(value => value + 1)}>{t('command-center.history.next')}</Button>
     </Flex>
-    {detail !== undefined && <section>
-      <Flex vertical gap={ 8 }>
+    {selected !== undefined && <Modal open={active} size="L" title={t('command-center.history.details')}
+      onCancel={closeDetail} footer={<Button onClick={closeDetail}>{t('command-center.actions.close')}</Button>}>
+      {detailError !== '' && <Alert type="error" message={detailError} />}
+      {detail === undefined && detailError === '' && <Content loading />}
+      {detail !== undefined && <Flex vertical gap={ 8 }>
         {detail.parentRunId !== undefined && <Button onClick={() => { setDetail(undefined); setSelected(detail.parentRunId) }}>{t('command-center.workflows.parent')}</Button>}
         {detail.workflowSteps !== undefined && <WorkflowRunView id={detail.id} active={active} />}
         <Title level={ 3 }>{detail.command} · {date(detail.startedAt)}</Title>
@@ -140,7 +157,7 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
         ) }] } />
         {detail.outputTruncated === true && <Text type="secondary">{t('command-center.history.truncated')}</Text>}
         <Output text={ detail.output } minHeight={ 160 } maxHeight={ 500 } />
-      </Flex>
-    </section>}
+      </Flex>}
+    </Modal>}
   </Flex>
 }
