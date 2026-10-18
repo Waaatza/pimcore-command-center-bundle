@@ -1,3 +1,4 @@
+import { useTranslation } from '@pimcore/studio-ui-bundle/app'
 import { commandCenterUrl } from './api'
 import { ScheduleEditor } from './schedule-editor'
 import { NotificationFields, type Recipient } from './notification-fields'
@@ -36,15 +37,18 @@ export interface PlannedCommand {
   lastRun: RunResult | null
 }
 
-const repeatLabels = { once: 'Einmalig', hourly: 'Stündlich', daily: 'Täglich', weekly: 'Wöchentlich' }
-const statusLabels = { running: 'Läuft', success: 'Erfolgreich', failed: 'Fehlgeschlagen', interrupted: 'Unterbrochen' }
-const formatDate = (value: string | null): string => value === null ? '—' : new Date(value).toLocaleString()
+
 
 export const ScheduledCommands = ({ draft, active, onEdit }: {
   draft: CommandDraft
   active: boolean
   onEdit: () => void
 }): React.JSX.Element => {
+  const { t, i18n } = useTranslation()
+  const formatDate = (value: string | null): string => value === null ? '—' : new Date(value).toLocaleString(i18n.language)
+  const repeatLabels = { once: t('command-center.repeat.once'), hourly: t('command-center.repeat.hourly'), daily: t('command-center.repeat.daily'), weekly: t('command-center.repeat.weekly') }
+  const statusLabels = { running: t('command-center.status.running'), success: t('command-center.status.success'), failed: t('command-center.status.failed'), interrupted: t('command-center.status.interrupted') }
+
   const [recipients, setRecipients] = useState<Recipient[]>([])
   const [recipientIds, setRecipientIds] = useState<number[]>([])
   const [channels, setChannels] = useState<string[]>([])
@@ -71,7 +75,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
         const response = await fetch(commandCenterUrl('schedules'), {
           signal: abort.signal, cache: 'no-store'
         })
-        if (!response.ok) throw new Error(`Zeitpläne konnten nicht geladen werden (${response.status}).`)
+        if (!response.ok) throw new Error(t('command-center.error.schedules', { status: response.status }))
         const data = await response.json() as { schedules: PlannedCommand[], lastHeartbeat: string | null, recipients: Recipient[] }
         if (abort.signal.aborted) return
         setItems(data.schedules)
@@ -82,7 +86,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
             signal: abort.signal, cache: 'no-store'
           })
           if (result.status === 404) { setSelectedId(undefined); setDetail(undefined) } else {
-            if (!result.ok) throw new Error(`Ergebnis konnte nicht geladen werden (${result.status}).`)
+            if (!result.ok) throw new Error(t('command-center.error.result', { status: result.status }))
             const selected = await result.json() as PlannedCommand
             if (!abort.signal.aborted) setDetail(selected)
           }
@@ -104,9 +108,9 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
     try {
       const tokens: unknown = JSON.parse(draft.tokens)
       if (!Array.isArray(tokens) || !tokens.every(value => typeof value === 'string')) {
-        throw new Error('Argumente müssen ein JSON-Array aus Strings sein.')
+        throw new Error(t('command-center.error.arguments'))
       }
-      if (runAt === '' || new Date(runAt).getTime() <= Date.now()) throw new Error('Bitte einen zukünftigen Termin wählen.')
+      if (runAt === '' || new Date(runAt).getTime() <= Date.now()) throw new Error(t('command-center.error.future-date'))
       const response = await fetch(commandCenterUrl('schedules/create'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -115,8 +119,8 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
           execution: { ...draft, tokens }
         })
       })
-      if (!response.ok) throw new Error(`Zeitplan wurde nicht gespeichert (${response.status}): ${await response.text()}`)
-      setNotice('Zeitplan gespeichert.')
+      if (!response.ok) throw new Error(t('command-center.error.create', { status: response.status, detail: await response.text() }))
+      setNotice(t('command-center.notice.saved'))
       setRevision(value => value + 1)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -132,7 +136,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: item.id, action, csrfToken: draft.csrfToken })
       })
-      if (!response.ok) throw new Error(`Zeitplan konnte nicht geändert werden (${response.status}): ${await response.text()}`)
+      if (!response.ok) throw new Error(t('command-center.error.change', { status: response.status, detail: await response.text() }))
       if (action === 'delete' && item.id === selectedId) { setSelectedId(undefined); setDetail(undefined) }
       setRevision(value => value + 1)
     } catch (reason) {
@@ -142,36 +146,35 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
 
   return (
     <div style={ { display: 'flex', flexDirection: 'column', gap: 16 } }>
-      <p>Ausführungen laufen auch bei geschlossenem Studio. Pro Ausführung gelten maximal fünf Minuten.
-        Verpasste Wiederholungen werden zu einer Ausführung zusammengefasst.</p>
-      <small>Letztes Worker-Signal: {heartbeat === null ? 'Noch kein Signal empfangen.' : formatDate(heartbeat)}</small>
+      <p>{t('command-center.ui.schedule-help')}</p>
+      <small>{t('command-center.ui.worker', { date: heartbeat === null ? t('command-center.ui.no-heartbeat') : formatDate(heartbeat) })}</small>
       <fieldset style={ { display: 'flex', flexDirection: 'column', gap: 12, padding: 16, border: '1px solid #8886' } }>
-        <legend>Neuen Zeitplan anlegen</legend>
-        <div>Command: <strong>{draft.command ?? 'Noch keiner ausgewählt'}</strong>{draft.phpCode !== null && ' · mit PHP-Code'}
-          <Button type="link" onClick={ onEdit }>Command und Parameter bearbeiten</Button>
+        <legend>{t('command-center.ui.new-schedule')}</legend>
+        <div>{t('command-center.ui.command')}: <strong>{draft.command ?? t('command-center.ui.none-selected')}</strong>{draft.phpCode !== null && t('command-center.ui.with-php')}
+          <Button type="link" onClick={ onEdit }>{t('command-center.ui.edit-command')}</Button>
         </div>
-        <small>Verwendet die aktuelle Auswahl aus „Direkt ausführen“. Der gespeicherte Zeitplan behält eine eigene Kopie.</small>
-        <label htmlFor="schedule-label">Name</label>
+        <small>{t('command-center.ui.draft-help')}</small>
+        <label htmlFor="schedule-label">{t('command-center.ui.name')}</label>
         <Input id="schedule-label" value={ label } maxLength={ 120 } onChange={ event => setLabel(event.target.value) } />
-        <label htmlFor="schedule-run-at">Erste Ausführung ({timezone})</label>
+        <label htmlFor="schedule-run-at">{t('command-center.ui.first-at', { timezone })}</label>
         <Input id="schedule-run-at" type="datetime-local" value={ runAt } onChange={ event => setRunAt(event.target.value) } />
-        <label htmlFor="schedule-repeat">Wiederholung</label>
+        <label htmlFor="schedule-repeat">{t('command-center.ui.repeat')}</label>
         <Select id="schedule-repeat" value={ repeat } style={ { width: '100%', maxWidth: 'none' } }
           options={ Object.entries(repeatLabels).map(([value, label]) => ({ value, label })) }
           onChange={ (value: string) => setRepeat(value) } />
         <NotificationFields recipients={ recipients } ids={ recipientIds } channels={ channels }
           onIds={ setRecipientIds } onChannels={ setChannels } />
         <div><Button type="primary" disabled={ busy || draft.command === undefined || draft.csrfToken === '' || label.trim() === '' || runAt === '' }
-          onClick={ () => { void create() } }>Zeitplan speichern</Button></div>
+          onClick={ () => { void create() } }>{t('command-center.ui.save-schedule')}</Button></div>
       </fieldset>
       {error !== '' && <div role="alert">{error}</div>}
       {notice !== '' && <div role="status">{notice}</div>}
-      <h3>Gespeicherte Zeitpläne</h3>
-      {items.length === 0 && <p>Noch keine geplanten Ausführungen.</p>}
+      <h3>{t('command-center.ui.saved-schedules')}</h3>
+      {items.length === 0 && <p>{t('command-center.ui.no-schedules')}</p>}
       <div style={ { overflowX: 'auto' } }>
         <table style={ { width: '100%', borderCollapse: 'collapse', textAlign: 'left' } }>
           <thead><tr>
-            {['Name / Command', 'Wiederholung', 'Nächste Ausführung', 'Status', 'Letztes Ergebnis', 'Aktionen'].map(text => (
+            {[t('command-center.ui.name-command'), t('command-center.ui.repeat'), t('command-center.ui.next-execution'), t('command-center.ui.status'), t('command-center.ui.last-result'), t('command-center.ui.actions')].map(text => (
               <th key={ text } style={ { padding: 12 } }>{text}</th>
             ))}
           </tr></thead>
@@ -180,19 +183,19 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
               <td style={ { padding: 12 } }>{item.label}<br /><code>{item.command}</code></td>
               <td style={ { padding: 12 } }>{repeatLabels[item.repeat]}<br /><small>{item.timezone}</small></td>
               <td style={ { padding: 12 } }>{formatDate(item.nextRunAt)}</td>
-              <td style={ { padding: 12 } }>{item.lastRun?.status === 'running' ? 'In Ausführung' : item.enabled ? 'Aktiv' : item.nextRunAt === null ? 'Beendet' : 'Deaktiviert'}</td>
-              <td style={ { padding: 12 } }>{item.lastRun === null ? 'Noch nicht ausgeführt' :
-                `${statusLabels[item.lastRun.status]}${item.lastRun.exitCode !== null ? ` · Exit-Code ${item.lastRun.exitCode}` : ''}`}</td>
+              <td style={ { padding: 12 } }>{item.lastRun?.status === 'running' ? t('command-center.status.executing') : item.enabled ? t('command-center.status.active') : item.nextRunAt === null ? t('command-center.status.finished') : t('command-center.status.disabled')}</td>
+              <td style={ { padding: 12 } }>{item.lastRun === null ? t('command-center.ui.not-run') :
+                `${statusLabels[item.lastRun.status]}${item.lastRun.exitCode !== null ? t('command-center.ui.exit-code', { code: item.lastRun.exitCode }) : ''}`}</td>
               <td style={ { padding: 12 } }>
                 <Button disabled={ busy || (!item.enabled && item.nextRunAt === null) }
-                  onClick={ () => { void action(item, item.enabled ? 'disable' : 'enable') } }>{item.enabled ? 'Deaktivieren' : 'Aktivieren'}</Button>
-                <Button onClick={ () => { if (selectedId !== item.id) setDetail(undefined); setSelectedId(item.id); setEditingId(undefined) } }>Details</Button>
+                  onClick={ () => { void action(item, item.enabled ? 'disable' : 'enable') } }>{item.enabled ? t('command-center.ui.disable') : t('command-center.ui.enable')}</Button>
+                <Button onClick={ () => { if (selectedId !== item.id) setDetail(undefined); setSelectedId(item.id); setEditingId(undefined) } }>{t('command-center.ui.details')}</Button>
                 <Button disabled={ busy || item.lastRun?.status === 'running' } onClick={ () => {
                   if (selectedId !== item.id) setDetail(undefined)
                   setSelectedId(item.id); setEditingId(item.id)
-                } }>Bearbeiten</Button>
+                } }>{t('command-center.ui.edit')}</Button>
                 <Button danger disabled={ busy || item.lastRun?.status === 'running' }
-                  onClick={ () => { void action(item, 'delete') } }>Löschen</Button>
+                  onClick={ () => { void action(item, 'delete') } }>{t('command-center.ui.delete')}</Button>
               </td>
             </tr>
           ))}</tbody>
@@ -205,7 +208,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
             <ScheduleEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
               onCancel={ () => setEditingId(undefined) }
               onSaved={ updated => {
-                setDetail(updated); setEditingId(undefined); setNotice('Zeitplan aktualisiert.'); setRevision(value => value + 1)
+                setDetail(updated); setEditingId(undefined); setNotice(t('command-center.notice.updated')); setRevision(value => value + 1)
               } } />
           ) : (
             <NotificationEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
@@ -213,18 +216,18 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
           )}
           {detail.lastRun?.notifications !== undefined && detail.lastRun.notifications.length > 0 && (
             <ul>{detail.lastRun.notifications.map((delivery, index) => (
-              <li key={ index }>{delivery.channel === 'email' ? 'E-Mail' : 'Studio'} · Nutzer {delivery.userId ?? '—'}:
-                {delivery.status === 'sent' ? ' versendet' : ` Versand fehlgeschlagen: ${delivery.error ?? ''}`}</li>
+              <li key={ index }>{delivery.channel === 'email' ? t('command-center.notify.email') : 'Studio'}{t('command-center.ui.user', { id: delivery.userId ?? '—' })}
+                {delivery.status === 'sent' ? t('command-center.notify.sent') : t('command-center.notify.failed', { error: delivery.error ?? '' })}</li>
             ))}</ul>
           )}
-          <p>Letzter Start: {formatDate(detail.lastRun?.startedAt ?? null)} · Ende: {formatDate(detail.lastRun?.finishedAt ?? null)}</p>
-          <details><summary>Gespeicherte Parameter und PHP-Code</summary>
+          <p>{t('command-center.ui.last-times', { start: formatDate(detail.lastRun?.startedAt ?? null), end: formatDate(detail.lastRun?.finishedAt ?? null) })}</p>
+          <details><summary>{t('command-center.ui.saved-parameters')}</summary>
             <pre style={ { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }>{JSON.stringify(detail.tokens)}{'\n'}{detail.phpCode}</pre>
           </details>
-          <pre aria-label="Geplante Command-Ausgabe" style={ {
+          <pre aria-label={t('command-center.ui.scheduled-output')} style={ {
             background: '#111827', color: '#e5e7eb', padding: 16, overflow: 'auto', maxHeight: 480,
             whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minHeight: 160
-          } }>{detail.lastRun?.output || 'Noch keine Ausgabe.'}</pre>
+          } }>{detail.lastRun?.output || t('command-center.ui.no-output')}</pre>
         </section>
       )}
     </div>
@@ -236,6 +239,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
 const NotificationEditor = ({ item, recipients, csrfToken, onSaved }: {
   item: PlannedCommand, recipients: Recipient[], csrfToken: string, onSaved: () => void
 }): React.JSX.Element => {
+  const { t } = useTranslation()
   const [ids, setIds] = useState(item.notificationRecipientIds ?? [])
   const [channels, setChannels] = useState(item.notificationChannels ?? [])
   const [busy, setBusy] = useState(false)
@@ -248,18 +252,18 @@ const NotificationEditor = ({ item, recipients, csrfToken, onSaved }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: item.id, csrfToken, notificationRecipientIds: ids, notificationChannels: channels })
       })
-      if (!response.ok) throw new Error(`Speichern fehlgeschlagen (${response.status}): ${await response.text()}`)
-      setMessage('Benachrichtigungen gespeichert. Änderungen gelten ab der nächsten Ausführung.')
+      if (!response.ok) throw new Error(t('command-center.error.save', { status: response.status, detail: await response.text() }))
+      setMessage(t('command-center.notice.notifications-saved'))
       onSaved()
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : String(reason)) }
     finally { setBusy(false) }
   }
   return (
     <fieldset style={ { display: 'flex', flexDirection: 'column', gap: 12, padding: 16, border: '1px solid #8886' } }>
-      <legend>Fehlerbenachrichtigungen</legend>
+      <legend>{t('command-center.notify.settings')}</legend>
       <NotificationFields recipients={ recipients } ids={ ids } channels={ channels }
         onIds={ setIds } onChannels={ setChannels } />
-      <div><Button disabled={ busy } onClick={ () => { void save() } }>Benachrichtigungen speichern</Button></div>
+      <div><Button disabled={ busy } onClick={ () => { void save() } }>{t('command-center.notify.save')}</Button></div>
       {message !== '' && <div role="status">{message}</div>}
     </fieldset>
   )

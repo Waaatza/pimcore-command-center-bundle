@@ -1,3 +1,4 @@
+import { useTranslation } from '@pimcore/studio-ui-bundle/app'
 import { commandCenterUrl } from './api'
 import React, { useEffect, useRef, useState } from 'react'
 import { Button, Content, TextArea, Select, Tabs } from '@pimcore/studio-ui-bundle/components'
@@ -14,15 +15,16 @@ interface Definition {
 }
 
 export const CommandCenter = (): React.JSX.Element => {
+  const { t } = useTranslation()
   const [tab, setTab] = useState('direct')
   const [draft, setDraft] = useState<CommandDraft>({ tokens: '[]', phpCode: null, csrfToken: '' })
 
   return (
     <Content padded padding="large">
-      <h2>Command Control Center</h2>
+      <h2>{t('command-center.ui.title')}</h2>
       <Tabs activeKey={ tab } onChange={ setTab } noPadding items={ [
-        { key: 'direct', label: 'Direkt ausführen', children: <CommandRunner onDraftChange={ setDraft } /> },
-        { key: 'scheduled', label: 'Geplante Ausführungen', children:
+        { key: 'direct', label: t('command-center.tabs.direct'), children: <CommandRunner onDraftChange={ setDraft } /> },
+        { key: 'scheduled', label: t('command-center.tabs.scheduled'), children:
           <ScheduledCommands draft={ draft } active={ tab === 'scheduled' } onEdit={ () => setTab('direct') } /> }
       ] } />
     </Content>
@@ -30,14 +32,16 @@ export const CommandCenter = (): React.JSX.Element => {
 }
 
 const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft) => void }): React.JSX.Element => {
+  const { t } = useTranslation()
   const [csrfToken, setCsrfToken] = useState('')
   const [commands, setCommands] = useState<Definition[]>([])
   const [selected, setSelected] = useState<string>()
   const [tokens, setTokens] = useState('[]')
-  const [phpCode, setPhpCode] = useState('<?php\n\necho "Hallo aus Pimcore!\\n";\n')
+  const [phpCode, setPhpCode] = useState('<?php\n\necho "Hello from Pimcore!\\n";\n')
   const inlineScript = selected === 'pimcore:run-script'
   const [output, setOutput] = useState('')
-  const [status, setStatus] = useState('Bereit')
+  const [status, setStatus] = useState('ready')
+  const [exitCode, setExitCode] = useState<number>()
   const [error, setError] = useState('')
   const [running, setRunning] = useState(false)
   const controller = useRef<AbortController>()
@@ -51,7 +55,7 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
   useEffect(() => {
     const abort = new AbortController()
     void fetch(commandCenterUrl('list'), { signal: abort.signal }).then(async response => {
-      if (!response.ok) throw new Error(`Command-Liste konnte nicht geladen werden (${response.status}).`)
+      if (!response.ok) throw new Error(t('command-center.error.command-list', { status: response.status }))
       const data = await response.json() as { commands: Definition[], csrfToken: string }
       setCommands(data.commands)
       setCsrfToken(data.csrfToken)
@@ -70,14 +74,14 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
       args = JSON.parse(tokens)
       if (!Array.isArray(args) || !args.every(value => typeof value === 'string')) throw new Error()
     } catch {
-      setError('Argumente müssen ein JSON-Array aus Strings sein.')
+      setError(t('command-center.error.arguments'))
       return
     }
     const abort = new AbortController()
     controller.current = abort
     setRunning(true)
     setOutput('')
-    setStatus('Läuft …')
+    setStatus('running-progress')
     let completed = false
     try {
       const response = await fetch(commandCenterUrl('run'), {
@@ -85,8 +89,8 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command: selected, tokens: args, csrfToken, phpCode: inlineScript ? phpCode : null })
       })
-      if (!response.ok) throw new Error(`Ausführung abgelehnt (${response.status}): ${await response.text()}`)
-      if (response.body === null) throw new Error('Ausgabe-Stream nicht verfügbar.')
+      if (!response.ok) throw new Error(t('command-center.error.run', { status: response.status, detail: await response.text() }))
+      if (response.body === null) throw new Error(t('command-center.error.stream'))
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let pending = ''
@@ -100,7 +104,8 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
           const event = JSON.parse(line) as { type: string, text?: string, code?: number }
           if (event.type === 'exit') {
             completed = true
-            setStatus(`Beendet · Exit-Code ${event.code}`)
+            setExitCode(event.code)
+            setStatus('exit')
           } else if (event.type === 'error') {
             throw new Error(event.text)
           } else {
@@ -109,9 +114,9 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
         }
         if (done) break
       }
-      if (!completed) throw new Error('Verbindung ohne Abschlussstatus beendet. Der Prozessstatus ist unbekannt.')
+      if (!completed) throw new Error(t('command-center.error.disconnected'))
     } catch (reason) {
-      setStatus('Unterbrochen')
+      setStatus('interrupted')
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
       setRunning(false)
@@ -126,17 +131,17 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
           style={ { width: '100%', maxWidth: 'none' } }
           showSearch
           disabled={ running }
-          placeholder="Symfony-Command auswählen"
+          placeholder={t('command-center.ui.choose-command')}
           value={ selected }
           options={ commands.map(item => ({ value: item.name, label: item.name })) }
           onChange={ (value: string) => { setSelected(value); setTokens('[]') } }
         />
         {command !== undefined && (
           <details>
-            <summary>{command.description || command.name} – Argumente und Optionen</summary>
+            <summary>{command.description || command.name} – {t('command-center.ui.arguments')}</summary>
             <ul>
               {Object.values(command.definition.arguments).map(arg => (
-                <li key={ arg.name }><code>{arg.name}</code>{arg.is_required ? ' (Pflicht)' : ''}: {arg.description}</li>
+                <li key={ arg.name }><code>{arg.name}</code>{arg.is_required ? t('command-center.ui.required') : ''}: {arg.description}</li>
               ))}
               {Object.values(command.definition.options).map(option => (
                 <li key={ option.name }><code>{option.name}</code>: {option.description}</li>
@@ -146,29 +151,28 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
         )}
         {inlineScript && (
           <>
-            <label htmlFor="command-center-php">PHP-Code</label>
+            <label htmlFor="command-center-php">{t('command-center.ui.php-code')}</label>
             <TextArea id="command-center-php" value={ phpCode } disabled={ running }
               onChange={ event => setPhpCode(event.target.value) } rows={ 12 }
               spellCheck={ false } style={ { fontFamily: 'monospace' } } />
-            <small>Mit oder ohne &lt;?php. Der Code läuft in der initialisierten Pimcore-Umgebung.
-              Die temporäre PHP-Datei wird nach der Ausführung gelöscht.</small>
+            <small>{t('command-center.ui.php-help')}</small>
           </>
         )}
         <label htmlFor="command-center-tokens">{inlineScript
-          ? 'Optionen als JSON-Array (z. B. ["--dry-run"]; kein Dateipfad nötig)'
-          : 'Argumente und Optionen als JSON-Array (ein Eintrag pro Argument)'}</label>
+          ? t('command-center.ui.inline-options')
+          : t('command-center.ui.arguments-json')}</label>
         <TextArea id="command-center-tokens" value={ tokens } disabled={ running }
           onChange={ event => setTokens(event.target.value) } rows={ 3 } />
-        <small>Beispiel: ["123", "--limit=10"]. Nicht interaktiv · maximal 5 Minuten · Ausgabe maximal 1 MB.</small>
+        <small>{t('command-center.ui.execution-help')}</small>
         <div>
-          <Button type="primary" disabled={ selected === undefined || running || (inlineScript && phpCode.trim() === '') } onClick={ () => { void run() } }>Ausführen</Button>
-          <span role="status" style={ { marginLeft: 16 } }>{status}</span>
+          <Button type="primary" disabled={ selected === undefined || running || (inlineScript && phpCode.trim() === '') } onClick={ () => { void run() } }>{t('command-center.ui.execute')}</Button>
+          <span role="status" style={ { marginLeft: 16 } }>{t(`command-center.status.${status}`, { code: exitCode })}</span>
         </div>
         {error !== '' && <div role="alert">{error}</div>}
-        <pre ref={ terminal } aria-label="Command-Ausgabe" style={ {
+        <pre ref={ terminal } aria-label={t('command-center.ui.output')} style={ {
           background: '#111827', color: '#e5e7eb', padding: 16, overflow: 'auto',
           whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minHeight: 240, flex: 1
-        } }>{output || 'Noch keine Ausgabe.'}</pre>
+        } }>{output || t('command-center.ui.no-output')}</pre>
       </div>
     </>
   )

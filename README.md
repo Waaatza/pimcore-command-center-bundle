@@ -14,6 +14,12 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 See [Tips and script examples](docs/tips.md), including
 [sending a Studio notification to all active users](docs/tips.md#notify-all-active-users).
 
+## Languages
+
+The interface follows the Studio user language and includes English and German translations for tabs,
+forms, actions, status labels and application messages. Dates follow the selected UI language.
+Command descriptions/output and user-supplied PHP code are not translated.
+
 ## Compatibility
 
 | Platform | Pimcore core | Studio UI / Backend | PHP |
@@ -144,6 +150,7 @@ composer install
 composer test
 cd assets
 npm ci
+npm run check-translations
 npm run check-types
 npm run build
 ```

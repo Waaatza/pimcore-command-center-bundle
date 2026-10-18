@@ -1,12 +1,13 @@
 {
   "name": "pimcore-command-center-bundle",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "rsbuild build",
     "dev": "rsbuild dev",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "check-translations": "node scripts/check-translations.mjs"
   },
   "dependencies": {
     "@pimcore/studio-ui-bundle": "2026.3.2",
