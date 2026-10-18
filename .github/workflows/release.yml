@@ -29,6 +29,9 @@ jobs:
         working-directory: assets
         run: npm ci --ignore-scripts
 
+      - name: Fetch existing tags
+        run: git fetch --force --tags origin
+
       - name: Build frontend
         working-directory: assets
         run: npm run build
@@ -48,16 +51,24 @@ jobs:
           git commit -m "Build assets for ${{ github.ref_name }}"
 
       - name: Force-update tag
+        id: tag
         run: |
-          git tag -f "${{ github.ref_name }}" HEAD
-          git push --force origin "refs/tags/${{ github.ref_name }}"
+          TAG="${{ github.ref_name }}"
+          # Keep the annotator's message; ignore a message left by a previous CI build commit.
+          MSG="$(git for-each-ref --format='%(contents)' "refs/tags/$TAG" | sed -e 's/[[:space:]]*$//')"
+          if printf '%s\n' "$MSG" | head -n1 | grep -q '^Build assets for '; then MSG=""; fi
+          if [ -z "$MSG" ]; then MSG="Release $TAG"; fi
+          printf 'subject=%s\n' "$(printf '%s\n' "$MSG" | head -n1)" >> "$GITHUB_OUTPUT"
+          git tag -f -a "$TAG" -m "$MSG" HEAD
+          git push --force origin "refs/tags/$TAG"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          TITLE="${{ steps.tag.outputs.subject }}"
           if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
+            gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "$TITLE" --generate-notes
           else
-            gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
+            gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "$TITLE" --generate-notes
           fi
