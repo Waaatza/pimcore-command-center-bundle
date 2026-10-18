@@ -41,7 +41,8 @@
       "@php tests/CommandCenter/editing.php",
       "@php tests/CommandCenter/history.php",
       "@php tests/CommandCenter/templates.php",
-      "@php tests/CommandCenter/workflows.php"
+      "@php tests/CommandCenter/workflows.php",
+      "@php tests/CommandCenter/terminal.php"
     ]
   }
 }

@@ -14,6 +14,8 @@ final class PimcoreCommandCenterExtension extends Extension
 {
     public function load(array $configs, ContainerBuilder $container): void
     {
+        $config = $this->processConfiguration(new Configuration(), $configs);
+        $container->setParameter('command_center.terminal', $config['terminal']);
         $container->registerForAutoconfiguration(CommandPreviewProviderInterface::class)
             ->addTag('command_center.preview_provider');
 

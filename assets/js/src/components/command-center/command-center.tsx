@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Collapse, Content, Flex, Form, FormKit, Select, Tabs, Text, TextArea, Title } from '@pimcore/studio-ui-bundle/components'
 
 import { Workflows } from './workflows'
+import { InteractiveTerminal } from './interactive-terminal'
 import { CommandTemplates } from './command-templates'
 import { RunHistory } from './run-history'
 import { ScheduledCommands, type CommandDraft } from './scheduled-commands'
@@ -33,6 +34,7 @@ export const CommandCenter = (): React.JSX.Element => {
         { key: 'workflows', label: t('command-center.tabs.workflows'), children: <Workflows active={tab === 'workflows'} draft={draft} onScheduled={() => setTab('scheduled')} /> },
         { key: 'templates', label: t('command-center.tabs.templates'), children: <CommandTemplates active={tab === 'templates'} draft={draft} /> },
         { key: 'history', label: t('command-center.tabs.history'), children: <RunHistory active={tab === 'history'} /> },
+        { key: 'terminal', label: t('command-center.tabs.terminal'), forceRender: true, children: <InteractiveTerminal active={tab === 'terminal'} csrfToken={draft.csrfToken} /> },
         { key: 'scheduled', label: t('command-center.tabs.scheduled'), children:
           <ScheduledCommands draft={ draft } active={ tab === 'scheduled' } onEdit={ () => setTab('direct') } /> }
       ] } />

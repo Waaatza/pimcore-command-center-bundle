@@ -1,4 +1,8 @@
 watza_command_center:
-    resource: '../../src/Controller/'
+    resource: '../../src/Controller/Studio/'
     type: attribute
     prefix: '%pimcore_studio_backend.url_prefix%'
+
+watza_command_center_internal:
+    resource: '../../src/Controller/Internal/'
+    type: attribute

@@ -50,7 +50,8 @@ for (const [prefix, values] of Object.entries({
   history: ['started', 'command', 'source', 'status', 'duration', 'exit', 'details'],
   'workflows.step-status': ['pending', 'running', 'success', 'failed', 'skipped', 'interrupted'],
   repeat: ['once', 'hourly', 'daily', 'weekly'],
-  'templates.type': ['string', 'integer', 'choice']
+  'templates.type': ['string', 'integer', 'choice'],
+  'terminal.status': ['disconnected', 'connecting', 'connected', 'reconnecting']
 })) {
   for (const value of values) {
     const key = `command-center.${prefix}.${value}`

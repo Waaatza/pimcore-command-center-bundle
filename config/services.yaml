@@ -19,3 +19,7 @@ services:
 
     Watza\CommandCenterBundle\Service\FailureNotifierInterface:
         alias: Watza\CommandCenterBundle\Service\FailureNotificationService
+
+    Watza\CommandCenterBundle\Service\TerminalService:
+        arguments:
+            $config: '%command_center.terminal%'

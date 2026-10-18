@@ -71,4 +71,20 @@ jobs:
       - run: npm run check-translations
       - run: npm run check-types
       - run: npm run check-template-preview
+      - run: npm run check-terminal
       - run: npm run build
+
+  terminal:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terminal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: terminal/package-lock.json
+      - run: npm ci
+      - run: npm test

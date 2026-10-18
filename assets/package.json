@@ -1,6 +1,6 @@
 {
   "name": "pimcore-command-center-bundle",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,11 +8,14 @@
     "dev": "rsbuild dev",
     "check-types": "tsc --noEmit",
     "check-translations": "node scripts/check-translations.mjs",
-    "check-template-preview": "node scripts/check-template-preview.mjs"
+    "check-template-preview": "node scripts/check-template-preview.mjs",
+    "check-terminal": "node scripts/check-terminal.mjs"
   },
   "dependencies": {
     "@pimcore/studio-ui-bundle": "2026.3.2",
     "@tanstack/react-table": "^8.21.3",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
