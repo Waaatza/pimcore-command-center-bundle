@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Button, Flex, FormKit, Modal, Text } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Button, Content, Flex, Form, FormKit, Icon, Modal, Tag, Text } from '@pimcore/studio-ui-bundle/components'
 import { ActionHttpError, actionFetch, type ActionRequest, type ActionResult, type PreparedAction } from './studio-actions-api'
 import { InputFields } from './input-fields'
 import { Output } from './output'
+import { StepList } from './step-list'
+import { statusColor } from './workflow-run'
 
 interface Preview {
   supported: boolean
@@ -122,29 +124,47 @@ export const StudioActionDialog = ({ request, onClose }: {
     } catch { setError(t('command-center.actions.error')) } finally { setBusy(false) }
   }
 
-  return <Modal open title={prepared?.label ?? t('command-center.actions.run')} footer={null} onCancel={onClose}>
-    <Flex vertical gap={12}>
-      {error !== '' && <Alert type="error" message={error} />}
-      {prepared !== undefined && !started && <FormKit wrapInPanel={false} formProps={{ disabled: busy }}>
-        <InputFields fields={prepared.fields} values={values} onChange={next => { setValues(next); setPreview(undefined) }} />
-        {prepared.bound.map((item, index) => <Text key={index}>{item.label}: {item.value}</Text>)}
-      </FormKit>}
-      {!started && prepared !== undefined && <Flex gap={8}>
-        {prepared.previewSupported && <Button disabled={busy} onClick={() => { void showPreview() }}>{t('command-center.templates.preview')}</Button>}
-        <Button type="primary" disabled={busy || (prepared.previewSupported && preview?.supported !== true) || prepared.fields.some(field => field.required === true && (values[field.name] ?? field.default ?? '').trim() === '')} onClick={() => { void run() }}>{t('command-center.ui.execute')}</Button>
-      </Flex>}
-      {preview?.supported === true && <Flex vertical gap={4}>
-        <Text>{t('command-center.templates.preview-count', { count: preview.count })}</Text>
-        <Text>{preview.message}</Text>
-        {preview.samples?.map((item, index) => <Text key={index}>{item.label}: {item.before} → {item.after}</Text>)}
-      </Flex>}
-      {preview?.supported === false && <Text>{t('command-center.templates.no-preview')}</Text>}
-      {result !== undefined && <Flex vertical gap={8}>
-        <Text role="status">{t(`command-center.history.status.${result.status}`)}</Text>
-        {result.steps.map((step, index) => <Text key={index}>{step.label}: {t(`command-center.workflows.step-status.${step.status}`)}</Text>)}
-      </Flex>}
-      {output !== '' && <Output text={output} label={t('command-center.ui.output')} maxHeight={320} />}
-      <Button onClick={onClose}>{t('command-center.actions.close')}</Button>
+  return <Modal open
+    title={ <Flex align="center" gap={ 8 }>
+      { prepared !== undefined && <Icon value={ prepared.icon } type={ prepared.iconType ?? 'name' } /> }
+      <span>{ prepared?.label ?? t('command-center.actions.run') }</span>
+    </Flex> }
+    onCancel={ onClose }
+    footer={ <Flex align="center" justify="space-between">
+      <Flex gap={ 8 }>
+        { prepared !== undefined && !started && prepared.previewSupported &&
+          <Button disabled={ busy } onClick={ () => { void showPreview() } }>{ t('command-center.templates.preview') }</Button> }
+      </Flex>
+      <Flex gap={ 8 }>
+        <Button onClick={ onClose }>{ t('command-center.actions.close') }</Button>
+        { prepared !== undefined && !started && <Button type="primary"
+          disabled={ busy || (prepared.previewSupported && preview?.supported !== true) || prepared.fields.some(field => field.required === true && (values[field.name] ?? field.default ?? '').trim() === '') }
+          onClick={ () => { void run() } }>{ t('command-center.ui.execute') }</Button> }
+      </Flex>
+    </Flex> }>
+    <Flex vertical gap={ 12 }>
+      { error !== '' && <Alert type="error" message={ error } /> }
+      { prepared === undefined && error === '' && <Content loading /> }
+      { started && result === undefined && error === '' && <Content loading /> }
+      { prepared !== undefined && !started && <FormKit wrapInPanel={ false } formProps={ { disabled: busy } }>
+        <InputFields fields={ prepared.fields } values={ values } onChange={ next => { setValues(next); setPreview(undefined) } } />
+        { prepared.bound.map((item, index) => (
+          <Form.Item key={ index } label={ item.label }><Text code>{ item.value }</Text></Form.Item>
+        )) }
+      </FormKit> }
+      { preview?.supported === true && <Flex vertical gap={ 4 }>
+        <Text strong>{ t('command-center.templates.preview-count', { count: preview.count }) }</Text>
+        <Text>{ preview.message }</Text>
+        { preview.samples?.map((item, index) => <Text key={ index }>{ item.label }: { item.before } → { item.after }</Text>) }
+      </Flex> }
+      { preview?.supported === false && <Text type="secondary">{ t('command-center.templates.no-preview') }</Text> }
+      { result !== undefined && <Flex vertical gap={ 8 }>
+        <Tag role="status" color={ statusColor(result.status) }>{ t(`command-center.history.status.${result.status}`) }</Tag>
+        { result.steps.length > 0 && <StepList items={ result.steps.map((step, index) => <React.Fragment key={ index }>
+          <Text strong>{ step.label }</Text> · <Tag color={ statusColor(step.status) }>{ t(`command-center.workflows.step-status.${step.status}`) }</Tag>
+        </React.Fragment>) } /> }
+      </Flex> }
+      { output !== '' && <Output text={ output } label={ t('command-center.ui.output') } maxHeight={ 320 } /> }
     </Flex>
   </Modal>
 }

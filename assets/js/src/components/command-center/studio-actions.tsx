@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Button, Flex, Form, FormKit, IconSelector, Input, Modal, Select, Switch, Text } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Box, Button, Flex, Form, FormKit, IconSelector, Input, Modal, Select, Switch, Text } from '@pimcore/studio-ui-bundle/components'
 import { actionFetch, actionsChanged, type ActionPlacement } from './studio-actions-api'
 import type { InputField } from './input-fields'
 
@@ -140,12 +140,14 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
       <Form.Item label={t('command-center.actions.enabled')}><Switch checked={editor.enabled} onChange={enabled => patch({ enabled })} /></Form.Item>
       <Form.Item label={t('command-center.actions.direct')}><Switch checked={editor.direct} onChange={direct => patch({ direct })} /></Form.Item>
       <Form.Item label={t('command-center.actions.show-output')}><Switch checked={editor.showOutput} onChange={showOutput => patch({ showOutput })} /></Form.Item>
-      <Flex gap={8}>
-        <Button type="primary" disabled={busy || editor.label.trim() === '' || editor.targetId === '' || editor.placements.length === 0}
-          onClick={() => { void saved(false) }}>{t('command-center.actions.save')}</Button>
-        {editor.id !== undefined && <Button danger disabled={busy} onClick={() => setDeleting(true)}>{t('command-center.actions.delete')}</Button>}
-        <Button disabled={busy} onClick={() => { setEditor(undefined); setSelected(undefined) }}>{t('command-center.templates.cancel')}</Button>
-      </Flex>
+      <Box margin={ { top: 'normal' } }>
+        <Flex gap={ 12 }>
+          <Button type="primary" disabled={busy || editor.label.trim() === '' || editor.targetId === '' || editor.placements.length === 0}
+            onClick={() => { void saved(false) }}>{t('command-center.actions.save')}</Button>
+          {editor.id !== undefined && <Button danger disabled={busy} onClick={() => setDeleting(true)}>{t('command-center.actions.delete')}</Button>}
+          <Button disabled={busy} onClick={() => { setEditor(undefined); setSelected(undefined) }}>{t('command-center.templates.cancel')}</Button>
+        </Flex>
+      </Box>
     </FormKit>}
     {deleting && <Modal open title={t('command-center.actions.delete')} onCancel={() => setDeleting(false)}
       confirmLoading={busy} onOk={() => { void saved(true) }}>

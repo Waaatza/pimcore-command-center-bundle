@@ -111,6 +111,9 @@ const dialog = compile('components/command-center/studio-action-dialog.tsx', {
   '@pimcore/studio-ui-bundle/app': app,
   '@pimcore/studio-ui-bundle/components': components,
   './input-fields': { InputFields: 'InputFields' }, './output': { Output: 'Output' },
+  './step-list': { StepList: 'StepList' },
+  './workflow-run': { statusColor: status => status === 'success' ? 'success'
+    : status === 'failed' ? 'error' : ['queued', 'running'].includes(status) ? 'processing' : 'default' },
   './studio-actions-api': api
 })
 const request = { id: 'action', revision: 1, targetRevision: 1, placement: 'object', context: { type: 'object', id: 11 }, csrfToken: 'csrf' }
@@ -126,7 +129,7 @@ const render = () => {
   return tree
 }
 const nodes = tree => Array.isArray(tree) ? tree.flatMap(nodes)
-  : React.isValidElement(tree) ? [tree, ...nodes(tree.props.children)] : []
+  : React.isValidElement(tree) ? [tree, ...nodes(tree.props.children), ...nodes(tree.props.footer)] : []
 const button = (tree, key) => nodes(tree).find(node => node.type === 'Button' && node.props.children === key)
 const field = tree => nodes(tree).find(node => node.type === 'InputFields')
 const settle = async () => { await setImmediate(); await setImmediate() }

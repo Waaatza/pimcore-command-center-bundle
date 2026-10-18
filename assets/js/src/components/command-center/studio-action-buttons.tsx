@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Button, Flex, Icon, IconButton, Tooltip } from '@pimcore/studio-ui-bundle/components'
+import { Button, Flex, Icon, IconButton, Tooltip } from '@pimcore/studio-ui-bundle/components'
 import { useDataObject } from '@pimcore/studio-ui-bundle/modules/data-object'
 import { useAsset } from '@pimcore/studio-ui-bundle/modules/asset'
 import { useDocument } from '@pimcore/studio-ui-bundle/modules/document'
@@ -51,11 +51,9 @@ export const StudioActionButtons = ({ placement, context = null }: {
   return <>
     <Flex vertical={placement === 'global'} align={placement === 'global' ? 'center' : undefined}
       gap={placement === 'global' ? 0 : 8} wrap={placement !== 'global'}>
-      {error && (placement === 'global'
-        ? <Tooltip title={t('command-center.actions.error')} placement="right">
-            <span role="alert" aria-label={t('command-center.actions.error')}><Icon value="warning-circle" /></span>
-          </Tooltip>
-        : <Alert type="error" message={t('command-center.actions.error')} />)}
+      {error && <Tooltip title={t('command-center.actions.error')} placement={placement === 'global' ? 'right' : 'bottom'}>
+        <span role="alert" aria-label={t('command-center.actions.error')}><Icon value="warning-circle" /></span>
+      </Tooltip>}
       {items.map(action => placement === 'global'
         ? <IconButton key={action.id} icon={{ value: action.icon, type: action.iconType ?? 'name' }} aria-label={action.label}
             type="text" tooltip={{ title: action.label, placement: 'right' }} onClick={() => choose(action)} />
