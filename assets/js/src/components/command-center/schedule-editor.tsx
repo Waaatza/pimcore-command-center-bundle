@@ -72,15 +72,16 @@ export const ScheduleEditor = ({ item, recipients, csrfToken, onSaved, onCancel 
       <legend>{t('command-center.ui.edit-schedule')}</legend>
       <label htmlFor="edit-schedule-name">{t('command-center.ui.name')}</label>
       <Input id="edit-schedule-name" value={ label } maxLength={ 120 } onChange={ event => setLabel(event.target.value) } />
+      {item.workflow !== undefined && <p>{t('command-center.workflows.snapshot-help')} <strong>{item.workflow.label}</strong></p>}
       <label htmlFor="edit-schedule-command">{t('command-center.ui.command')}</label>
-      <Select id="edit-schedule-command" showSearch value={ command } style={ { width: '100%', maxWidth: 'none' } }
+      <Select id="edit-schedule-command" disabled={item.workflow !== undefined} showSearch value={ command } style={ { width: '100%', maxWidth: 'none' } }
         options={ commands.map(value => ({ value: value.name, label: value.name })) }
         onChange={ (value: string) => { setCommand(value); setTokens('[]') } } />
       <label htmlFor="edit-schedule-args">{t('command-center.ui.arguments-short')}</label>
-      <TextArea id="edit-schedule-args" value={ tokens } rows={ 3 } onChange={ event => setTokens(event.target.value) } />
+      <TextArea disabled={item.workflow !== undefined} id="edit-schedule-args" value={ tokens } rows={ 3 } onChange={ event => setTokens(event.target.value) } />
       {command === 'pimcore:run-script' && <>
         <label htmlFor="edit-schedule-php">{t('command-center.ui.php-code')}</label>
-        <TextArea id="edit-schedule-php" value={ phpCode } rows={ 10 } spellCheck={ false }
+        <TextArea disabled={item.workflow !== undefined} id="edit-schedule-php" value={ phpCode } rows={ 10 } spellCheck={ false }
           style={ { fontFamily: 'monospace' } } onChange={ event => setPhpCode(event.target.value) } />
       </>}
       <label htmlFor="edit-schedule-time">{t('command-center.ui.next-at', { timezone })}</label>

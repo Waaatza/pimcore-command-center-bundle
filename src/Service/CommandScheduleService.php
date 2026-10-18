@@ -25,6 +25,7 @@ final readonly class CommandScheduleService
         private CsrfTokenManagerInterface $csrfTokenManager,
         private SecurityServiceInterface $security,
         private ScheduleRecipientService $recipients,
+        private ?CommandWorkflowService $workflows = null,
     ) {
     }
 
@@ -36,7 +37,7 @@ final readonly class CommandScheduleService
             'recipients' => $this->recipients->list(),
             'lastHeartbeat' => is_file($heartbeat) ? gmdate(DATE_ATOM, filemtime($heartbeat)) : null,
             'schedules' => array_map(static function (array $item): array {
-                unset($item['phpCode'], $item['tokens'], $item['lastRun']['output']);
+                unset($item['phpCode'], $item['tokens'], $item['lastRun']['output'], $item['workflow']['steps']);
 
                 return $item;
             }, $this->store->all()),
@@ -77,7 +78,7 @@ final readonly class CommandScheduleService
 
     public function update(CommandScheduleUpdateParameters $parameters): array
     {
-        [$fields, $user] = $this->validatedFields($parameters->schedule);
+        [$fields, $user] = $this->validatedFields($parameters->schedule, $this->get($parameters->id)['workflow'] ?? null);
 
         return $this->store->update(static function (array &$items) use ($parameters, $fields, $user): array {
             $item = $items[$parameters->id] ?? throw new NotFoundHttpException('Schedule not found.');
@@ -98,10 +99,32 @@ final readonly class CommandScheduleService
         });
     }
 
-    private function validatedFields(CommandScheduleParameters $parameters): array
+    private function validatedFields(CommandScheduleParameters $parameters, ?array $preservedWorkflow = null): array
     {
         $this->checkToken($parameters->execution->csrfToken);
-        $this->commands->validate($parameters->execution);
+        $workflow = $preservedWorkflow;
+        if ($workflow === null && $parameters->workflow !== null) {
+            $reference = $parameters->workflow;
+            if (!is_string($reference['id'] ?? null) || !is_int($reference['revision'] ?? null)
+                || $this->workflows === null || array_diff(array_keys($reference), ['id', 'revision'])) {
+                throw new BadRequestHttpException('Invalid workflow reference.');
+            }
+            $workflow = $this->workflows->snapshot($reference['id'], $reference['revision']);
+        }
+        $execution = $parameters->execution;
+        if ($workflow !== null) {
+            foreach ($workflow['steps'] as $step) {
+                $this->commands->validate(new \Watza\CommandCenterBundle\Parameter\CommandRunParameters(
+                    $step['command'], tokens: $step['tokens'], phpCode: $step['phpCode'] ?? null,
+                ));
+            }
+            $first = $workflow['steps'][0];
+            $execution = new \Watza\CommandCenterBundle\Parameter\CommandRunParameters(
+                $first['command'], tokens: $first['tokens'], phpCode: $first['phpCode'] ?? null,
+            );
+        } else {
+            $this->commands->validate($execution);
+        }
         $this->recipients->validate($parameters->notificationRecipientIds, $parameters->notificationChannels);
         try {
             $runAt = new \DateTimeImmutable($parameters->runAt);
@@ -120,15 +143,15 @@ final readonly class CommandScheduleService
 
         return [[
             'label' => trim($parameters->label),
-            'command' => $parameters->execution->command,
-            'tokens' => $parameters->execution->tokens,
-            'phpCode' => $parameters->execution->phpCode,
+            'command' => $execution->command,
+            'tokens' => $execution->tokens,
+            'phpCode' => $execution->phpCode,
             'repeat' => $parameters->repeat,
             'timezone' => $parameters->timezone,
             'nextRunAt' => $runAt->setTimezone(new \DateTimeZone('UTC'))->format(DATE_ATOM),
             'notificationRecipientIds' => array_values(array_unique($parameters->notificationRecipientIds)),
             'notificationChannels' => array_values(array_unique($parameters->notificationChannels)),
-        ], $user];
+        ] + ($workflow === null ? [] : ['workflow' => $workflow]), $user];
     }
 
     public function action(CommandScheduleActionParameters $parameters): void

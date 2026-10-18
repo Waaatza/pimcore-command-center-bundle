@@ -12,6 +12,7 @@ final readonly class CommandScheduleRunner
         private CommandScheduleStore $store,
         private CommandCenterService $commands,
         private FailureNotifierInterface $notifier,
+        private ?CommandWorkflowRunner $workflows = null,
     )
     {
     }
@@ -31,9 +32,13 @@ final readonly class CommandScheduleRunner
             $interrupted = [];
             $item = $this->claim(new \DateTimeImmutable(), $interrupted);
             foreach ($interrupted as $unfinished) {
+                if (isset($unfinished['workflow'], $unfinished['lastRun']['historyId'])) {
+                    $this->workflows?->interrupt($unfinished['lastRun']['historyId']);
+                }
                 $this->notifyFailure($unfinished);
             }
             if ($item === null) {
+                $this->workflows?->tickQueued();
                 return;
             }
             $output = '';
@@ -42,7 +47,7 @@ final readonly class CommandScheduleRunner
             $lastFlush = microtime(true);
             try {
                 $parameters = new CommandRunParameters($item['command'], '', $item['tokens'], $item['phpCode']);
-                $this->commands->execute($parameters, function (array $event) use (
+                $receive = function (array $event) use (
                     $item, &$output, &$exitCode, &$error, &$lastFlush,
                 ): void {
                     if ($event['type'] === 'run') {
@@ -59,7 +64,16 @@ final readonly class CommandScheduleRunner
                         $this->saveResult($item['id'], ['output' => $output]);
                         $lastFlush = microtime(true);
                     }
-                }, ['source' => 'scheduled', 'scheduleId' => $item['id'], 'scheduleLabel' => $item['label']]);
+                };
+                $context = ['source' => 'scheduled', 'scheduleId' => $item['id'], 'scheduleLabel' => $item['label']];
+                if (isset($item['workflow'])) {
+                    if ($this->workflows === null) {
+                        throw new \RuntimeException('Workflow runner is unavailable.');
+                    }
+                    $this->workflows->execute($item['workflow'], $receive, $context);
+                } else {
+                    $this->commands->execute($parameters, $receive, $context);
+                }
             } catch (\Throwable $exception) {
                 $error = $exception->getMessage();
                 $output = substr($output . "\n" . $error, -1000000);

@@ -1,5 +1,6 @@
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
 import { commandCenterUrl } from './api'
+import { WorkflowRunView } from './workflow-run'
 import { ScheduleEditor } from './schedule-editor'
 import { NotificationFields, type Recipient } from './notification-fields'
 import React, { useEffect, useState } from 'react'
@@ -14,6 +15,7 @@ export interface CommandDraft {
 
 interface Delivery { userId?: number, channel?: string, status: string, error?: string }
 interface RunResult {
+  historyId?: string
   status: 'running' | 'success' | 'failed' | 'interrupted'
   startedAt: string
   finishedAt: string | null
@@ -22,6 +24,7 @@ interface RunResult {
   output?: string
 }
 export interface PlannedCommand {
+  workflow?: { id: string, revision: number, label: string, steps?: Array<{ label: string, command: string }> }
   id: string
   revision?: number
   label: string
@@ -180,7 +183,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
           </tr></thead>
           <tbody>{items.map(item => (
             <tr key={ item.id } style={ { borderTop: '1px solid #8886' } }>
-              <td style={ { padding: 12 } }>{item.label}<br /><code>{item.command}</code></td>
+              <td style={ { padding: 12 } }>{item.label}<br /><code>{item.workflow?.label ?? item.command}</code></td>
               <td style={ { padding: 12 } }>{repeatLabels[item.repeat]}<br /><small>{item.timezone}</small></td>
               <td style={ { padding: 12 } }>{formatDate(item.nextRunAt)}</td>
               <td style={ { padding: 12 } }>{item.lastRun?.status === 'running' ? t('command-center.status.executing') : item.enabled ? t('command-center.status.active') : item.nextRunAt === null ? t('command-center.status.finished') : t('command-center.status.disabled')}</td>
@@ -224,6 +227,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
           <details><summary>{t('command-center.ui.saved-parameters')}</summary>
             <pre style={ { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }>{JSON.stringify(detail.tokens)}{'\n'}{detail.phpCode}</pre>
           </details>
+          {detail.workflow !== undefined && detail.lastRun?.historyId !== undefined && <WorkflowRunView id={detail.lastRun.historyId} active={active} />}
           <pre aria-label={t('command-center.ui.scheduled-output')} style={ {
             background: '#111827', color: '#e5e7eb', padding: 16, overflow: 'auto', maxHeight: 480,
             whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minHeight: 160

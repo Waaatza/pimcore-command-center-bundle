@@ -45,9 +45,11 @@ for (const status of ['ready', 'running-progress', 'exit', 'interrupted']) {
   if (!en.has(`command-center.status.${status}`)) throw new Error(`Missing execution status: ${status}`)
 }
 for (const [prefix, values] of Object.entries({
-  'history.status': ['all', 'running', 'success', 'failed', 'timed_out', 'interrupted'],
-  'history.source': ['all', 'manual', 'scheduled', 'template', 'background'],
+  'history.status': ['all', 'queued', 'running', 'success', 'failed', 'timed_out', 'interrupted'],
+  'history.source': ['all', 'manual', 'scheduled', 'template', 'workflow', 'background'],
   history: ['started', 'command', 'source', 'status', 'duration', 'exit', 'details'],
+  'workflows.step-status': ['pending', 'running', 'success', 'failed', 'skipped', 'interrupted'],
+  repeat: ['once', 'hourly', 'daily', 'weekly'],
   'templates.type': ['string', 'integer', 'choice']
 })) {
   for (const value of values) {

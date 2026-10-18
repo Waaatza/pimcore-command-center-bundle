@@ -48,8 +48,13 @@ $security = new class implements SecurityServiceInterface {
 $csrf = new CsrfTokenManager();
 $token = $csrf->getToken('command-center')->getValue();
 $store = new CommandScheduleStore($directory . '/storage');
+$privateStorage = new \Watza\CommandCenterBundle\Service\PrivateJsonStorage($directory . '/storage');
+$workflowService = new \Watza\CommandCenterBundle\Service\CommandWorkflowService(
+    $privateStorage, new CommandCenterService($csrf, $directory, 'test'),
+    new \Watza\CommandCenterBundle\Service\CommandHistoryStore($privateStorage),
+);
 $service = new CommandScheduleService(
-    $store, new CommandCenterService($csrf, $directory, 'test'), $csrf, $security, new ScheduleRecipientService(),
+    $store, new CommandCenterService($csrf, $directory, 'test'), $csrf, $security, new ScheduleRecipientService(), $workflowService,
 );
 $check = static function (bool $value, string $message): void {
     if (!$value) { throw new RuntimeException($message); }
@@ -106,10 +111,28 @@ try {
     $expect(AccessDeniedHttpException::class, fn () => $service->update(
         new CommandScheduleUpdateParameters($id, $invalidToken, true, 2),
     ));
+    $workflow = $workflowService->save(new \Watza\CommandCenterBundle\Parameter\WorkflowSaveParameters(
+        $token, 'Scheduled definition', steps: [['label' => 'First', 'command' => 'test:a', 'tokens' => []]],
+    ));
+    $workflowPlan = $service->create(new CommandScheduleParameters(
+        new CommandRunParameters('test:a', $token), 'Workflow plan', '+1 hour',
+        workflow: ['id' => $workflow['id'], 'revision' => 1],
+    ));
+    $workflowService->delete(new \Watza\CommandCenterBundle\Parameter\WorkflowActionParameters($token, $workflow['id'], 1));
+    $updated = $service->update(new CommandScheduleUpdateParameters($workflowPlan['id'],
+        new CommandScheduleParameters(new CommandRunParameters('test:b', $token), 'Edited workflow plan', '+2 hours'), true, 0,
+    ));
+    $check($updated['workflow'] === $workflowPlan['workflow'] && $updated['command'] === 'test:a',
+        'Editing converted workflow into a single command or lost its snapshot after deletion');
     echo "Schedule editing checks passed.\n";
 } finally {
-    foreach (glob($directory . '/storage/*') ?: [] as $path) { unlink($path); }
-    if (is_dir($directory . '/storage')) { rmdir($directory . '/storage'); }
+    $remove = static function (string $path) use (&$remove): void {
+        if (is_dir($path)) {
+            foreach (array_diff(scandir($path), ['.', '..']) as $child) { $remove($path . '/' . $child); }
+            rmdir($path);
+        } else { unlink($path); }
+    };
+    if (is_dir($directory . '/storage')) { $remove($directory . '/storage'); }
     unlink($directory . '/bin/console');
     rmdir($directory . '/bin');
     rmdir($directory);

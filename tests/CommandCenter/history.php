@@ -54,6 +54,7 @@ try {
     $id = $history->start(new CommandRunParameters('test:run'), ['source' => 'manual']);
     $record = $storage->read('history', $id);
     $record['startedTimestamp'] -= 601;
+    $record['updatedTimestamp'] -= 601;
     $storage->write('history', $id, $record);
     $check($history->get($id)['status'] === 'interrupted', 'Abandoned run remained running');
     for ($i = 0; $i < 26; $i++) {

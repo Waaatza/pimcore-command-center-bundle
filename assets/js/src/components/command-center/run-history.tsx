@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
 import { Button, Select } from '@pimcore/studio-ui-bundle/components'
+import { WorkflowRunView } from './workflow-run'
 import { commandCenterUrl } from './api'
 
 interface Run {
@@ -11,7 +12,11 @@ interface Run {
   actorName: string | null
   scheduleLabel: string | null
   templateLabel: string | null
-  startedAt: string
+  workflowLabel?: string
+  parentRunId?: string
+  workflowSteps?: unknown[]
+  createdAt?: string
+  startedAt: string | null
   durationMs: number | null
   exitCode: number | null
   tokens?: string[]
@@ -59,16 +64,16 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
     const interval = window.setInterval(() => { void load() }, 5000)
     return () => { abort.abort(); window.clearInterval(interval) }
   }, [active, page, status, source, search, selected, refresh])
-  const date = (value: string): string => new Date(value).toLocaleString(i18n.language)
+  const date = (value: string | null): string => value === null ? '—' : new Date(value).toLocaleString(i18n.language)
   return <div style={ { display: 'flex', flexDirection: 'column', gap: 16 } }>
     <p>{t('command-center.history.help')}</p>
     <div style={ { display: 'flex', gap: 12, flexWrap: 'wrap' } }>
       <input aria-label={t('command-center.history.search')} placeholder={t('command-center.history.search')}
         value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} />
       <Select style={{ minWidth: 180 }} value={status} onChange={(value: string) => { setStatus(value); setPage(1) }}
-        options={['', 'running', 'success', 'failed', 'timed_out', 'interrupted'].map(value => ({ value, label: t(`command-center.history.status.${value || 'all'}`) }))} />
+        options={['', 'queued', 'running', 'success', 'failed', 'timed_out', 'interrupted'].map(value => ({ value, label: t(`command-center.history.status.${value || 'all'}`) }))} />
       <Select style={{ minWidth: 180 }} value={source} onChange={(value: string) => { setSource(value); setPage(1) }}
-        options={['', 'manual', 'scheduled', 'template', 'background'].map(value => ({ value, label: t(`command-center.history.source.${value || 'all'}`) }))} />
+        options={['', 'manual', 'scheduled', 'template', 'workflow', 'background'].map(value => ({ value, label: t(`command-center.history.source.${value || 'all'}`) }))} />
       <Button onClick={() => setRefresh(value => value + 1)}>{t('command-center.history.refresh')}</Button>
     </div>
     {error !== '' && <div role="alert">{error}</div>}
@@ -76,7 +81,7 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
       <thead><tr>{['started', 'command', 'source', 'status', 'duration', 'exit', 'details'].map(key =>
         <th key={key} style={{ textAlign: 'left', padding: 10 }}>{t(`command-center.history.${key}`)}</th>)}</tr></thead>
       <tbody>{items.map(run => <tr key={run.id}>
-        <td style={{ padding: 10 }}>{date(run.startedAt)}</td><td style={{ padding: 10 }}><code>{run.command}</code><br />{run.scheduleLabel ?? run.templateLabel}</td>
+        <td style={{ padding: 10 }}>{date(run.startedAt ?? run.createdAt ?? null)}</td><td style={{ padding: 10 }}><code>{run.command}</code><br />{run.workflowLabel ?? run.scheduleLabel ?? run.templateLabel}</td>
         <td style={{ padding: 10 }}>{t(`command-center.history.source.${run.source}`)}<br />{run.actorName}</td>
         <td style={{ padding: 10 }}>{t(`command-center.history.status.${run.status}`)}</td>
         <td style={{ padding: 10 }}>{run.durationMs === null ? '—' : `${(run.durationMs / 1000).toFixed(2)} s`}</td>
@@ -91,6 +96,8 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
       <Button disabled={page * 25 >= total} onClick={() => setPage(value => value + 1)}>{t('command-center.history.next')}</Button>
     </div>
     {detail !== undefined && <section>
+      {detail.parentRunId !== undefined && <Button onClick={() => { setDetail(undefined); setSelected(detail.parentRunId) }}>{t('command-center.workflows.parent')}</Button>}
+      {detail.workflowSteps !== undefined && <WorkflowRunView id={detail.id} active={active} />}
       <h3>{detail.command} · {date(detail.startedAt)}</h3>
       <p>{t(`command-center.history.status.${detail.status}`)} · {detail.id}</p>
       {detail.error != null && <p role="alert">{detail.error}</p>}

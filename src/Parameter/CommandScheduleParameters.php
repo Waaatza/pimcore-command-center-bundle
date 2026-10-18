@@ -25,6 +25,7 @@ final readonly class CommandScheduleParameters
         public array $notificationRecipientIds = [],
         #[Assert\Choice(choices: ['email', 'studio'], multiple: true)]
         public array $notificationChannels = [],
+        public ?array $workflow = null,
     ) {
     }
 }
