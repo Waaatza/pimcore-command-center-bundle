@@ -7,7 +7,7 @@
         window.alternativePluginExportPaths = {}
       }
 
-      window.pluginRemotes.watza_command_center_bundle = "/bundles/pimcorecommandcenter/build/08bfc93c-42b0-4646-b043-9e718ced3c39/static/js/remoteEntry.js"
+      window.pluginRemotes.watza_command_center_bundle = "/bundles/pimcorecommandcenter/build/900b2383-dae9-456d-8f8c-9a5b4675b05f/static/js/remoteEntry.js"
 
       
     

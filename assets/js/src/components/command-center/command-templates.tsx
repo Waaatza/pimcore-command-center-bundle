@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Button, Select, TextArea } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Block, Button, Flex, Form, FormKit, Input, Select, Switch, Text, TextArea, Title } from '@pimcore/studio-ui-bundle/components'
 import { commandCenterUrl } from './api'
+import { Output } from './output'
 import { type CommandDraft } from './scheduled-commands'
 
 interface Field {
@@ -28,16 +29,56 @@ interface Preview {
   message?: string
   samples?: Array<{ label: string, before?: string, after?: string }>
 }
+interface EditorValues {
+  fields: Field[]
+}
 const blank = (): Template => ({ label: '', description: '', command: '', tokens: [], fields: [] })
-const inputStyle = { width: '100%', padding: 8 }
+
+const RequiredField = ({ value, onChange }: { value?: boolean, onChange?: (value: boolean) => void }): React.JSX.Element => (
+  <Switch checked={ value === true } onChange={ (checked) => onChange?.(checked) } />
+)
+
+const ChoicesField = ({ value, onChange }: { value?: string[] | null, onChange?: (value: string[]) => void }): React.JSX.Element => (
+  <TextArea value={ (value ?? []).join('\n') } onChange={ event => onChange?.(event.target.value.split('\n')) } />
+)
+
+const TemplateFieldRow = ({ field }: { field?: Field }): React.JSX.Element => {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Form.Item label={ t('command-center.templates.field-name') } name="name" initialValue="">
+        <Input />
+      </Form.Item>
+      <Form.Item label={ t('command-center.templates.label') } name="label" initialValue="">
+        <Input />
+      </Form.Item>
+      <Form.Item label={ t('command-center.templates.type') } name="type" initialValue="string">
+        <Select options={ ['string', 'integer', 'choice'].map(type => ({ value: type, label: t(`command-center.templates.type.${type}`) })) } />
+      </Form.Item>
+      <Form.Item label={ t('command-center.templates.default') } name="default" initialValue="">
+        <Input />
+      </Form.Item>
+      {field?.type === 'choice' && (
+        <Form.Item label={ t('command-center.templates.choices') } name="choices">
+          <ChoicesField />
+        </Form.Item>
+      ) }
+      <Form.Item label={ t('command-center.templates.required') } name="required" initialValue={ true }>
+        <RequiredField />
+      </Form.Item>
+    </>
+  )
+}
 
 export const CommandTemplates = ({ active, draft }: { active: boolean, draft: CommandDraft }): React.JSX.Element => {
   const { t } = useTranslation()
+  const [editorForm] = Form.useForm<EditorValues>()
   const [items, setItems] = useState<Template[]>([])
   const [selected, setSelected] = useState<string>()
   const [values, setValues] = useState<Record<string, string>>({})
   const [preview, setPreview] = useState<Preview>()
   const [editor, setEditor] = useState<Template>()
+  const [session, setSession] = useState(0)
   const [tokens, setTokens] = useState('[]')
   const [commands, setCommands] = useState<string[]>([])
   const [csrfToken, setCsrfToken] = useState('')
@@ -48,6 +89,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
   const [deletePending, setDeletePending] = useState(false)
   const controller = useRef<AbortController>()
   const item = items.find(value => value.id === selected)
+  const watchedFields = Form.useWatch('fields', editorForm) as Field[] | undefined
   useEffect(() => () => { controller.current?.abort() }, [])
   useEffect(() => {
     if (!active) return
@@ -74,7 +116,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
     try { await action() } catch (reason) { setError(String(reason)) } finally { setBusy(false) }
   }
   const edit = (value: Template): void => {
-    setEditor({ ...value, fields: value.fields.map(field => ({ ...field })) }); setTokens(JSON.stringify(value.tokens, null, 2)); setDeletePending(false)
+    setEditor({ ...value, fields: value.fields.map(field => ({ ...field })) }); setTokens(JSON.stringify(value.tokens, null, 2)); setDeletePending(false); setSession(current => current + 1)
   }
   const run = async (): Promise<void> => {
     const abort = new AbortController(); controller.current = abort
@@ -108,15 +150,35 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
       }
     } finally { controller.current = undefined }
   }
-  const fieldUpdate = (index: number, change: Partial<Field>): void => {
-    if (editor !== undefined) setEditor({ ...editor, fields: editor.fields.map((field, at) => at === index ? { ...field, ...change } : field) })
+  const save = (): void => {
+    if (editor === undefined) return
+    void perform(async () => {
+      await new Promise(resolve => { window.setTimeout(resolve, 30) })
+      const current = editorForm.getFieldsValue(true) as EditorValues
+      const fields = (current.fields ?? []).map(raw => {
+        const field: Field = {
+          name: raw?.name ?? '', label: raw?.label ?? '', type: raw?.type ?? 'string', required: raw?.required ?? true
+        }
+        if (raw?.default !== undefined && raw?.default !== null) field.default = raw.default
+        if (raw?.choices !== undefined && raw?.choices !== null) field.choices = raw.choices
+        return field
+      })
+      const parsed: unknown = JSON.parse(tokens)
+      if (!Array.isArray(parsed) || !parsed.every(value => typeof value === 'string')) throw new Error(t('command-center.error.arguments'))
+      const response = await post('save', { id: editor.id ?? null, revision: editor.revision ?? null, label: editor.label, description: editor.description, command: editor.command, tokens: parsed, fields })
+      const saved = await response.json() as Template
+      setSelected(saved.id); setValues({}); setPreview(undefined); setEditor(undefined); setRefresh(value => value + 1)
+    })
   }
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-    <p>{t('command-center.templates.help')}</p>
-    <div style={{ display: 'flex', gap: 12 }}>
-      <Select style={{ flex: 1 }} value={selected} disabled={busy} placeholder={t('command-center.templates.choose')}
-        options={items.map(value => ({ value: value.id, label: value.label }))}
-        onChange={(id: string) => { setSelected(id); setValues({}); setPreview(undefined); setEditor(undefined); setOutput(''); setDeletePending(false); setError('') }} />
+  return <Flex vertical gap={ 16 }>
+    <Text type="secondary">{t('command-center.templates.help')}</Text>
+    <Flex gap={ 12 }>
+      <Flex style={ { flex: 1 } }>
+        <Select style={ { width: '100%', maxWidth: 'none' } } value={selected} disabled={busy} placeholder={t('command-center.templates.choose')}
+          popupMatchSelectWidth={ false }
+          options={items.map(value => ({ value: value.id, label: value.label }))}
+          onChange={(id: string) => { setSelected(id); setValues({}); setPreview(undefined); setEditor(undefined); setOutput(''); setDeletePending(false); setError('') }} />
+      </Flex>
       <Button disabled={busy} onClick={() => edit(blank())}>{t('command-center.templates.new')}</Button>
       <Button disabled={busy || draft.command === undefined || draft.phpCode !== null} onClick={() => {
         try { const args: unknown = JSON.parse(draft.tokens)
@@ -125,66 +187,87 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
         } catch (reason) { setError(String(reason)) }
       }}>{t('command-center.templates.from-draft')}</Button>
       {item !== undefined && <Button disabled={busy} onClick={() => edit(item)}>{t('command-center.templates.edit')}</Button>}
-    </div>
-    {error !== '' && <p role="alert">{error}</p>}
-    {editor !== undefined ? <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <label>{t('command-center.templates.label')}<input style={inputStyle} value={editor.label} disabled={busy} onChange={event => setEditor({ ...editor, label: event.target.value })} /></label>
-      <label>{t('command-center.templates.description')}<TextArea value={editor.description} disabled={busy} onChange={event => setEditor({ ...editor, description: event.target.value })} /></label>
-      <label>{t('command-center.history.command')}<Select style={{ width: '100%' }} showSearch value={editor.command || undefined} disabled={busy}
-        options={commands.map(name => ({ value: name, label: name }))} onChange={(command: string) => setEditor({ ...editor, command })} /></label>
-      <label>{t('command-center.ui.arguments-json')}<TextArea value={tokens} rows={3} disabled={busy} onChange={event => setTokens(event.target.value)} /></label>
-      <small>{t('command-center.templates.placeholder-help').replaceAll('{folder}', '{{folder}}')}</small>
-      <h3>{t('command-center.templates.fields')}</h3>
-      {editor.fields.map((field, index) => <fieldset key={index} disabled={busy} style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-        <label>{t('command-center.templates.field-name')}<input style={inputStyle} value={field.name} onChange={event => fieldUpdate(index, { name: event.target.value })} /></label>
-        <label>{t('command-center.templates.label')}<input style={inputStyle} value={field.label} onChange={event => fieldUpdate(index, { label: event.target.value })} /></label>
-        <label>{t('command-center.templates.type')}<select style={inputStyle} value={field.type} onChange={event => fieldUpdate(index, { type: event.target.value as Field['type'] })}>
-          {['string', 'integer', 'choice'].map(type => <option key={type} value={type}>{t(`command-center.templates.type.${type}`)}</option>)}
-        </select></label>
-        <label>{t('command-center.templates.default')}<input style={inputStyle} value={field.default ?? ''} onChange={event => fieldUpdate(index, { default: event.target.value })} /></label>
-        {field.type === 'choice' && <label>{t('command-center.templates.choices')}<TextArea value={(field.choices ?? []).join('\n')} onChange={event => fieldUpdate(index, { choices: event.target.value.split('\n') })} /></label>}
-        <label><input type="checkbox" checked={field.required ?? false} onChange={event => fieldUpdate(index, { required: event.target.checked })} /> {t('command-center.templates.required')}</label>
-        <Button onClick={() => setEditor({ ...editor, fields: editor.fields.filter((_, at) => at !== index) })}>{t('command-center.templates.remove-field')}</Button>
-      </fieldset>)}
-      <div style={{ display: 'flex', gap: 12 }}>
-        <Button disabled={busy || editor.fields.length >= 30} onClick={() => setEditor({ ...editor, fields: [...editor.fields, { name: '', label: '', type: 'string', required: true }] })}>{t('command-center.templates.add-field')}</Button>
-        <Button type="primary" disabled={busy || editor.label.trim() === '' || editor.command === ''} onClick={() => { void perform(async () => {
-          const parsed: unknown = JSON.parse(tokens)
-          if (!Array.isArray(parsed) || !parsed.every(value => typeof value === 'string')) throw new Error(t('command-center.error.arguments'))
-          const response = await post('save', { id: editor.id ?? null, revision: editor.revision ?? null, label: editor.label, description: editor.description, command: editor.command, tokens: parsed, fields: editor.fields })
-          const saved = await response.json() as Template
-          setSelected(saved.id); setValues({}); setPreview(undefined); setEditor(undefined); setRefresh(value => value + 1)
-        }) } }>{t('command-center.templates.save')}</Button>
-        <Button disabled={busy} onClick={() => setEditor(undefined)}>{t('command-center.templates.cancel')}</Button>
-      </div>
-    </div> : item !== undefined && <>
-      <h3>{item.label}</h3><p>{item.description}</p><code>{item.command}</code>
-      {item.fields.map(field => <label key={field.name}>{field.label}{field.required === true ? ' *' : ''}
-        {field.type === 'choice' ? <select disabled={busy} style={inputStyle} value={values[field.name] ?? field.default ?? ''} onChange={event => { setValues({ ...values, [field.name]: event.target.value }); setPreview(undefined) }}>
-          <option value="">{t('command-center.templates.choose-value')}</option>
-          {field.choices?.map(choice => <option key={choice} value={choice}>{choice}</option>)}
-        </select> : <input disabled={busy} style={inputStyle} type={field.type === 'integer' ? 'number' : 'text'} value={values[field.name] ?? field.default ?? ''}
-          onChange={event => { setValues({ ...values, [field.name]: event.target.value }); setPreview(undefined) }} />}
-      </label>)}
-      <div style={{ display: 'flex', gap: 12 }}>
-        <Button disabled={busy || item.previewSupported !== true} onClick={() => { void perform(async () => {
-          const response = await post('preview', actionData()); setPreview(await response.json() as Preview)
-        }) }}>{t('command-center.templates.preview')}</Button>
-        <Button type="primary" disabled={busy || (item.previewSupported === true && preview?.supported !== true)} onClick={() => { void perform(run) }}>{t('command-center.ui.execute')}</Button>
-        <Button disabled={busy} onClick={() => setDeletePending(true)}>{t('command-center.templates.delete')}</Button>
-      </div>
-      {item.previewSupported !== true && <p>{t('command-center.templates.no-preview')}</p>}
-      {preview?.supported === true && <section>
-        <h3>{t('command-center.templates.preview-count', { count: preview.count })}</h3>
-        <p>{preview.message}</p><p>{t('command-center.templates.preview-help')}</p>
-        <ul>{preview.samples?.map((sample, index) => <li key={index}><strong>{sample.label}</strong> {sample.before} {sample.after === undefined ? '' : `→ ${sample.after}`}</li>)}</ul>
-      </section>}
-      {deletePending && <div role="alert"><p>{t('command-center.templates.delete-confirm')}</p>
-        <Button disabled={busy} onClick={() => { void perform(async () => { await post('delete', actionData()); setSelected(undefined); setDeletePending(false); setRefresh(value => value + 1) }) }}>{t('command-center.templates.delete')}</Button>
-        <Button disabled={busy} onClick={() => setDeletePending(false)}>{t('command-center.templates.cancel')}</Button>
-      </div>}
-    </>}
-    {busy && <p role="status">{t('command-center.status.running-progress')}</p>}
-    {output !== '' && <pre style={{ background: '#111827', color: '#e5e7eb', padding: 16, maxHeight: 500, overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{output}</pre>}
-  </div>
+    </Flex>
+    {error !== '' && <Alert type="error" message={ error } />}
+    {editor !== undefined ? (
+      <FormKit key={ session } wrapInPanel={ false } formProps={ { form: editorForm, disabled: busy, initialValues: { fields: editor.fields } } }>
+        <Flex vertical gap={ 12 }>
+          <Form.Item label={ t('command-center.templates.label') }>
+            <Input value={editor.label} onChange={event => setEditor({ ...editor, label: event.target.value })} />
+          </Form.Item>
+          <Form.Item label={ t('command-center.templates.description') }>
+            <TextArea value={editor.description} onChange={event => setEditor({ ...editor, description: event.target.value })} />
+          </Form.Item>
+          <Form.Item label={ t('command-center.history.command') }>
+            <Select style={ { width: '100%', maxWidth: 'none' } } showSearch value={editor.command || undefined}
+              popupMatchSelectWidth={ false }
+              options={commands.map(name => ({ value: name, label: name }))} onChange={(command: string) => setEditor({ ...editor, command })} />
+          </Form.Item>
+          <Form.Item label={ t('command-center.ui.arguments-json') }>
+            <TextArea value={ tokens } rows={ 3 } onChange={ event => setTokens(event.target.value) } />
+          </Form.Item>
+          <Text type="secondary">{t('command-center.templates.placeholder-help').replaceAll('{folder}', '{{folder}}')}</Text>
+          <Form.Item label={ t('command-center.templates.fields') } name="fields">
+            <Block border maxItems={ 30 } noteditable={ busy }
+              getItemTitle={ (itemValue: Field | undefined, index) => itemValue?.label || itemValue?.name || `#${index + 1}` }>
+              { ({ blockIndex }) => <TemplateFieldRow field={ watchedFields?.[blockIndex] } /> }
+            </Block>
+          </Form.Item>
+          <Flex gap={ 12 }>
+            <Button type="primary" disabled={busy || editor.label.trim() === '' || editor.command === ''} onClick={ save }>{t('command-center.templates.save')}</Button>
+            <Button disabled={busy} onClick={() => setEditor(undefined)}>{t('command-center.templates.cancel')}</Button>
+          </Flex>
+        </Flex>
+      </FormKit>
+    ) : item !== undefined && (
+      <FormKit wrapInPanel={ false } formProps={ { disabled: busy } }>
+        <Flex vertical gap={ 8 }>
+          <Title level={ 3 }>{item.label}</Title>
+          <Text>{item.description}</Text>
+          <Text code>{item.command}</Text>
+          {item.fields.map(field => (
+            <Form.Item key={ field.name } label={ `${field.label}${field.required === true ? ' *' : ''}` }>
+              {field.type === 'choice' ? (
+                <Select style={ { width: '100%', maxWidth: 'none' } } value={values[field.name] ?? field.default ?? ''}
+                  popupMatchSelectWidth={ false }
+                  options={ (field.choices ?? []).map(choice => ({ value: choice, label: choice })) }
+                  placeholder={ t('command-center.templates.choose-value') }
+                  onChange={(value: string) => { setValues({ ...values, [field.name]: value }); setPreview(undefined) }} />
+              ) : (
+                <Input type={ field.type === 'integer' ? 'number' : 'text' } value={values[field.name] ?? field.default ?? ''}
+                  onChange={event => { setValues({ ...values, [field.name]: event.target.value }); setPreview(undefined) }} />
+              )}
+            </Form.Item>
+          ))}
+          <Flex gap={ 12 }>
+            <Button disabled={busy || item.previewSupported !== true} onClick={() => { void perform(async () => {
+              const response = await post('preview', actionData()); setPreview(await response.json() as Preview)
+            }) }}>{t('command-center.templates.preview')}</Button>
+            <Button type="primary" disabled={busy || (item.previewSupported === true && preview?.supported !== true)} onClick={() => { void perform(run) }}>{t('command-center.ui.execute')}</Button>
+            <Button disabled={busy} onClick={() => setDeletePending(true)}>{t('command-center.templates.delete')}</Button>
+          </Flex>
+          {item.previewSupported !== true && <Text type="secondary">{t('command-center.templates.no-preview')}</Text>}
+          {preview?.supported === true && (
+            <Flex vertical gap={ 8 }>
+              <Title level={ 3 }>{t('command-center.templates.preview-count', { count: preview.count })}</Title>
+              <Text>{preview.message}</Text>
+              <Text type="secondary">{t('command-center.templates.preview-help')}</Text>
+              <ul>{preview.samples?.map((sample, index) => <li key={index}><Text strong>{sample.label}</Text> {sample.before} {sample.after === undefined ? '' : `→ ${sample.after}`}</li>)}</ul>
+            </Flex>
+          )}
+          {deletePending && (
+            <Flex vertical gap={ 8 }>
+              <Alert type="warning" message={ t('command-center.templates.delete-confirm') } />
+              <Flex gap={ 12 }>
+                <Button danger disabled={busy} onClick={() => { void perform(async () => { await post('delete', actionData()); setSelected(undefined); setDeletePending(false); setRefresh(value => value + 1) }) }}>{t('command-center.templates.delete')}</Button>
+                <Button disabled={busy} onClick={() => setDeletePending(false)}>{t('command-center.templates.cancel')}</Button>
+              </Flex>
+            </Flex>
+          )}
+        </Flex>
+      </FormKit>
+    )}
+    {busy && <Text role="status">{t('command-center.status.running-progress')}</Text>}
+    {output !== '' && <Output text={ output } label={ t('command-center.ui.output') } minHeight={ 120 } maxHeight={ 500 } />}
+  </Flex>
 }

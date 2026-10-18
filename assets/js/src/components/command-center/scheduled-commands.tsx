@@ -1,10 +1,12 @@
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
 import { commandCenterUrl } from './api'
-import { WorkflowRunView } from './workflow-run'
+import { WorkflowRunView, statusColor } from './workflow-run'
+import { Output } from './output'
 import { ScheduleEditor } from './schedule-editor'
 import { NotificationFields, type Recipient } from './notification-fields'
 import React, { useEffect, useState } from 'react'
-import { Button, Input, Select } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Button, Collapse, Flex, Form, FormKit, Grid, Input, Select, Tag, Text, Title } from '@pimcore/studio-ui-bundle/components'
+import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 
 export interface CommandDraft {
   command?: string
@@ -40,7 +42,7 @@ export interface PlannedCommand {
   lastRun: RunResult | null
 }
 
-
+const columnHelper = createColumnHelper<PlannedCommand>()
 
 export const ScheduledCommands = ({ draft, active, onEdit }: {
   draft: CommandDraft
@@ -147,98 +149,139 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
     } finally { setBusy(false) }
   }
 
+  const scheduleStatus = (item: PlannedCommand): { label: string, color: string } => {
+    if (item.lastRun?.status === 'running') return { label: t('command-center.status.executing'), color: 'processing' }
+    if (item.enabled) return { label: t('command-center.status.active'), color: 'success' }
+    if (item.nextRunAt === null) return { label: t('command-center.status.finished'), color: 'default' }
+    return { label: t('command-center.status.disabled'), color: 'default' }
+  }
+
+  const columns: ColumnDef<any, any>[] = [
+    columnHelper.accessor('label', {
+      header: t('command-center.ui.name-command'), size: 220,
+      cell: info => <Flex vertical gap={ 0 }>
+        <Text>{info.getValue()}</Text>
+        <Text code>{info.row.original.workflow?.label ?? info.row.original.command}</Text>
+      </Flex>
+    }),
+    columnHelper.accessor('repeat', {
+      header: t('command-center.ui.repeat'), size: 130,
+      cell: info => <Flex vertical gap={ 0 }>
+        <Text>{repeatLabels[info.getValue() as keyof typeof repeatLabels]}</Text>
+        <Text type="secondary">{info.row.original.timezone}</Text>
+      </Flex>
+    }),
+    columnHelper.accessor('nextRunAt', {
+      header: t('command-center.ui.next-execution'), size: 180,
+      cell: info => formatDate(info.getValue())
+    }),
+    columnHelper.display({
+      id: 'status', header: t('command-center.ui.status'), size: 130,
+      cell: info => {
+        const value = scheduleStatus(info.row.original)
+        return <Tag color={ value.color }>{value.label}</Tag>
+      }
+    }),
+    columnHelper.display({
+      id: 'lastResult', header: t('command-center.ui.last-result'), size: 200,
+      cell: info => {
+        const run = info.row.original.lastRun
+        if (run === null) return <Text type="secondary">{t('command-center.ui.not-run')}</Text>
+        return <Flex vertical gap={ 0 }>
+          <Tag color={ statusColor(run.status) }>{statusLabels[run.status]}</Tag>
+          {run.exitCode !== null && <Text type="secondary">{t('command-center.ui.exit-code', { code: run.exitCode })}</Text>}
+        </Flex>
+      }
+    }),
+    columnHelper.display({
+      id: 'actions', header: t('command-center.ui.actions'), size: 340,
+      cell: info => {
+        const item = info.row.original
+        return <Flex gap={ 8 } wrap>
+          <Button disabled={ busy || (!item.enabled && item.nextRunAt === null) }
+            onClick={ () => { void action(item, item.enabled ? 'disable' : 'enable') } }>{item.enabled ? t('command-center.ui.disable') : t('command-center.ui.enable')}</Button>
+          <Button onClick={ () => { if (selectedId !== item.id) setDetail(undefined); setSelectedId(item.id); setEditingId(undefined) } }>{t('command-center.ui.details')}</Button>
+          <Button disabled={ busy || item.lastRun?.status === 'running' } onClick={ () => {
+            if (selectedId !== item.id) setDetail(undefined)
+            setSelectedId(item.id); setEditingId(item.id)
+          } }>{t('command-center.ui.edit')}</Button>
+          <Button danger disabled={ busy || item.lastRun?.status === 'running' }
+            onClick={ () => { void action(item, 'delete') } }>{t('command-center.ui.delete')}</Button>
+        </Flex>
+      }
+    })
+  ]
+
   return (
-    <div style={ { display: 'flex', flexDirection: 'column', gap: 16 } }>
-      <p>{t('command-center.ui.schedule-help')}</p>
-      <small>{t('command-center.ui.worker', { date: heartbeat === null ? t('command-center.ui.no-heartbeat') : formatDate(heartbeat), interpolation: { escapeValue: false } })}</small>
-      <fieldset style={ { display: 'flex', flexDirection: 'column', gap: 12, padding: 16, border: '1px solid #8886' } }>
-        <legend>{t('command-center.ui.new-schedule')}</legend>
-        <div>{t('command-center.ui.command')}: <strong>{draft.command ?? t('command-center.ui.none-selected')}</strong>{draft.phpCode !== null && t('command-center.ui.with-php')}
-          <Button type="link" onClick={ onEdit }>{t('command-center.ui.edit-command')}</Button>
-        </div>
-        <small>{t('command-center.ui.draft-help')}</small>
-        <label htmlFor="schedule-label">{t('command-center.ui.name')}</label>
-        <Input id="schedule-label" value={ label } maxLength={ 120 } onChange={ event => setLabel(event.target.value) } />
-        <label htmlFor="schedule-run-at">{t('command-center.ui.first-at', { timezone, interpolation: { escapeValue: false } })}</label>
-        <Input id="schedule-run-at" type="datetime-local" value={ runAt } onChange={ event => setRunAt(event.target.value) } />
-        <label htmlFor="schedule-repeat">{t('command-center.ui.repeat')}</label>
-        <Select id="schedule-repeat" value={ repeat } style={ { width: '100%', maxWidth: 'none' } }
-          options={ Object.entries(repeatLabels).map(([value, label]) => ({ value, label })) }
-          onChange={ (value: string) => setRepeat(value) } />
-        <NotificationFields recipients={ recipients } ids={ recipientIds } channels={ channels }
-          onIds={ setRecipientIds } onChannels={ setChannels } />
-        <div><Button type="primary" disabled={ busy || draft.command === undefined || draft.csrfToken === '' || label.trim() === '' || runAt === '' }
-          onClick={ () => { void create() } }>{t('command-center.ui.save-schedule')}</Button></div>
-      </fieldset>
-      {error !== '' && <div role="alert">{error}</div>}
-      {notice !== '' && <div role="status">{notice}</div>}
-      <h3>{t('command-center.ui.saved-schedules')}</h3>
-      {items.length === 0 && <p>{t('command-center.ui.no-schedules')}</p>}
-      <div style={ { overflowX: 'auto' } }>
-        <table style={ { width: '100%', borderCollapse: 'collapse', textAlign: 'left' } }>
-          <thead><tr>
-            {[t('command-center.ui.name-command'), t('command-center.ui.repeat'), t('command-center.ui.next-execution'), t('command-center.ui.status'), t('command-center.ui.last-result'), t('command-center.ui.actions')].map(text => (
-              <th key={ text } style={ { padding: 12 } }>{text}</th>
-            ))}
-          </tr></thead>
-          <tbody>{items.map(item => (
-            <tr key={ item.id } style={ { borderTop: '1px solid #8886' } }>
-              <td style={ { padding: 12 } }>{item.label}<br /><code>{item.workflow?.label ?? item.command}</code></td>
-              <td style={ { padding: 12 } }>{repeatLabels[item.repeat]}<br /><small>{item.timezone}</small></td>
-              <td style={ { padding: 12 } }>{formatDate(item.nextRunAt)}</td>
-              <td style={ { padding: 12 } }>{item.lastRun?.status === 'running' ? t('command-center.status.executing') : item.enabled ? t('command-center.status.active') : item.nextRunAt === null ? t('command-center.status.finished') : t('command-center.status.disabled')}</td>
-              <td style={ { padding: 12 } }>{item.lastRun === null ? t('command-center.ui.not-run') :
-                `${statusLabels[item.lastRun.status]}${item.lastRun.exitCode !== null ? t('command-center.ui.exit-code', { code: item.lastRun.exitCode }) : ''}`}</td>
-              <td style={ { padding: 12 } }>
-                <Button disabled={ busy || (!item.enabled && item.nextRunAt === null) }
-                  onClick={ () => { void action(item, item.enabled ? 'disable' : 'enable') } }>{item.enabled ? t('command-center.ui.disable') : t('command-center.ui.enable')}</Button>
-                <Button onClick={ () => { if (selectedId !== item.id) setDetail(undefined); setSelectedId(item.id); setEditingId(undefined) } }>{t('command-center.ui.details')}</Button>
-                <Button disabled={ busy || item.lastRun?.status === 'running' } onClick={ () => {
-                  if (selectedId !== item.id) setDetail(undefined)
-                  setSelectedId(item.id); setEditingId(item.id)
-                } }>{t('command-center.ui.edit')}</Button>
-                <Button danger disabled={ busy || item.lastRun?.status === 'running' }
-                  onClick={ () => { void action(item, 'delete') } }>{t('command-center.ui.delete')}</Button>
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>
+    <Flex vertical gap={ 16 }>
+      <Text type="secondary">{t('command-center.ui.schedule-help')}</Text>
+      <Text type="secondary">{t('command-center.ui.worker', { date: heartbeat === null ? t('command-center.ui.no-heartbeat') : formatDate(heartbeat), interpolation: { escapeValue: false } })}</Text>
+      <FormKit wrapInPanel={ false }>
+        <FormKit.Panel theme="fieldset" title={ t('command-center.ui.new-schedule') }>
+          <Flex vertical gap={ 12 }>
+            <Flex align="center" gap={ 8 } wrap>
+              <Text>{t('command-center.ui.command')}: <Text strong>{draft.command ?? t('command-center.ui.none-selected')}</Text>{draft.phpCode !== null && t('command-center.ui.with-php')}</Text>
+              <Button type="link" onClick={ onEdit }>{t('command-center.ui.edit-command')}</Button>
+            </Flex>
+            <Text type="secondary">{t('command-center.ui.draft-help')}</Text>
+            <Form.Item label={ t('command-center.ui.name') }>
+              <Input value={ label } maxLength={ 120 } onChange={ event => setLabel(event.target.value) } />
+            </Form.Item>
+            <Form.Item label={ t('command-center.ui.first-at', { timezone, interpolation: { escapeValue: false } }) }>
+              <Input type="datetime-local" value={ runAt } onChange={ event => setRunAt(event.target.value) } />
+            </Form.Item>
+            <Form.Item label={ t('command-center.ui.repeat') }>
+              <Select value={ repeat } style={ { width: '100%', maxWidth: 'none' } }
+                options={ Object.entries(repeatLabels).map(([value, label]) => ({ value, label })) }
+                onChange={ (value: string) => setRepeat(value) } />
+            </Form.Item>
+            <NotificationFields recipients={ recipients } ids={ recipientIds } channels={ channels }
+              onIds={ setRecipientIds } onChannels={ setChannels } />
+            <Flex>
+              <Button type="primary" disabled={ busy || draft.command === undefined || draft.csrfToken === '' || label.trim() === '' || runAt === '' }
+                onClick={ () => { void create() } }>{t('command-center.ui.save-schedule')}</Button>
+            </Flex>
+          </Flex>
+        </FormKit.Panel>
+      </FormKit>
+      {error !== '' && <Alert type="error" message={ error } />}
+      {notice !== '' && <Alert type="success" message={ notice } />}
+      <Title level={ 3 }>{t('command-center.ui.saved-schedules')}</Title>
+      {items.length === 0 && <Text type="secondary">{t('command-center.ui.no-schedules')}</Text>}
+      <Grid columns={ columns } data={ items } size="small" />
       {detail !== undefined && (
         <section>
-          <h3>{detail.label}</h3>
-          {editingId === detail.id ? (
-            <ScheduleEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
-              onCancel={ () => setEditingId(undefined) }
-              onSaved={ updated => {
-                setDetail(updated); setEditingId(undefined); setNotice(t('command-center.notice.updated')); setRevision(value => value + 1)
-              } } />
-          ) : (
-            <NotificationEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
-              onSaved={ () => setRevision(value => value + 1) } />
-          )}
-          {detail.lastRun?.notifications !== undefined && detail.lastRun.notifications.length > 0 && (
-            <ul>{detail.lastRun.notifications.map((delivery, index) => (
-              <li key={ index }>{delivery.channel === 'email' ? t('command-center.notify.email') : 'Studio'}{t('command-center.ui.user', { id: delivery.userId ?? '—' })}
-                {delivery.status === 'sent' ? t('command-center.notify.sent') : t('command-center.notify.failed', { error: delivery.error ?? '' })}</li>
-            ))}</ul>
-          )}
-          <p>{t('command-center.ui.last-times', { start: formatDate(detail.lastRun?.startedAt ?? null), end: formatDate(detail.lastRun?.finishedAt ?? null), interpolation: { escapeValue: false } })}</p>
-          <details><summary>{t('command-center.ui.saved-parameters')}</summary>
-            <pre style={ { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }>{JSON.stringify(detail.tokens)}{'\n'}{detail.phpCode}</pre>
-          </details>
-          {detail.workflow !== undefined && detail.lastRun?.historyId !== undefined && <WorkflowRunView id={detail.lastRun.historyId} active={active} />}
-          <pre aria-label={t('command-center.ui.scheduled-output')} style={ {
-            background: '#111827', color: '#e5e7eb', padding: 16, overflow: 'auto', maxHeight: 480,
-            whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minHeight: 160
-          } }>{detail.lastRun?.output || t('command-center.ui.no-output')}</pre>
+          <Flex vertical gap={ 8 }>
+            <Title level={ 3 }>{detail.label}</Title>
+            {editingId === detail.id ? (
+              <ScheduleEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
+                onCancel={ () => setEditingId(undefined) }
+                onSaved={ updated => {
+                  setDetail(updated); setEditingId(undefined); setNotice(t('command-center.notice.updated')); setRevision(value => value + 1)
+                } } />
+            ) : (
+              <NotificationEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
+                onSaved={ () => setRevision(value => value + 1) } />
+            )}
+            {detail.lastRun?.notifications !== undefined && detail.lastRun.notifications.length > 0 && (
+              <Flex vertical gap={ 4 }>
+                {detail.lastRun.notifications.map((delivery, index) => (
+                  <Text key={ index }>{delivery.channel === 'email' ? t('command-center.notify.email') : 'Studio'}{t('command-center.ui.user', { id: delivery.userId ?? '—' })}
+                    {delivery.status === 'sent' ? t('command-center.notify.sent') : t('command-center.notify.failed', { error: delivery.error ?? '' })}</Text>
+                ))}
+              </Flex>
+            )}
+            <Text type="secondary">{t('command-center.ui.last-times', { start: formatDate(detail.lastRun?.startedAt ?? null), end: formatDate(detail.lastRun?.finishedAt ?? null), interpolation: { escapeValue: false } })}</Text>
+            <Collapse items={ [{ key: 'parameters', label: t('command-center.ui.saved-parameters'), children:
+              <Output text={ `${JSON.stringify(detail.tokens)}\n${detail.phpCode ?? ''}` } label={ t('command-center.ui.saved-parameters') } /> }] } />
+            {detail.workflow !== undefined && detail.lastRun?.historyId !== undefined && <WorkflowRunView id={detail.lastRun.historyId} active={active} />}
+            <Output text={ detail.lastRun?.output } label={ t('command-center.ui.scheduled-output') } minHeight={ 160 } maxHeight={ 480 } />
+          </Flex>
         </section>
       )}
-    </div>
+    </Flex>
   )
 }
-
-
 
 const NotificationEditor = ({ item, recipients, csrfToken, onSaved }: {
   item: PlannedCommand, recipients: Recipient[], csrfToken: string, onSaved: () => void
@@ -248,9 +291,11 @@ const NotificationEditor = ({ item, recipients, csrfToken, onSaved }: {
   const [channels, setChannels] = useState(item.notificationChannels ?? [])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [failed, setFailed] = useState(false)
   const save = async (): Promise<void> => {
     setBusy(true)
     setMessage('')
+    setFailed(false)
     try {
       const response = await fetch(commandCenterUrl('schedules/notifications'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -259,16 +304,19 @@ const NotificationEditor = ({ item, recipients, csrfToken, onSaved }: {
       if (!response.ok) throw new Error(t('command-center.error.save', { status: response.status, detail: await response.text() }))
       setMessage(t('command-center.notice.notifications-saved'))
       onSaved()
-    } catch (reason) { setMessage(reason instanceof Error ? reason.message : String(reason)) }
+    } catch (reason) { setMessage(reason instanceof Error ? reason.message : String(reason)); setFailed(true) }
     finally { setBusy(false) }
   }
   return (
-    <fieldset style={ { display: 'flex', flexDirection: 'column', gap: 12, padding: 16, border: '1px solid #8886' } }>
-      <legend>{t('command-center.notify.settings')}</legend>
-      <NotificationFields recipients={ recipients } ids={ ids } channels={ channels }
-        onIds={ setIds } onChannels={ setChannels } />
-      <div><Button disabled={ busy } onClick={ () => { void save() } }>{t('command-center.notify.save')}</Button></div>
-      {message !== '' && <div role="status">{message}</div>}
-    </fieldset>
+    <FormKit wrapInPanel={ false } formProps={ { disabled: busy } }>
+      <FormKit.Panel theme="fieldset" title={ t('command-center.notify.settings') }>
+        <Flex vertical gap={ 12 }>
+          <NotificationFields recipients={ recipients } ids={ ids } channels={ channels }
+            onIds={ setIds } onChannels={ setChannels } />
+          <Flex><Button disabled={ busy } onClick={ () => { void save() } }>{t('command-center.notify.save')}</Button></Flex>
+          {message !== '' && <Alert type={ failed ? 'error' : 'success' } message={ message } />}
+        </Flex>
+      </FormKit.Panel>
+    </FormKit>
   )
 }

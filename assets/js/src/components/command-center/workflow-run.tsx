@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Button } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Button, Flex, Tag, Text, Title } from '@pimcore/studio-ui-bundle/components'
 import { commandCenterUrl } from './api'
+import { Output } from './output'
+import { StepList } from './step-list'
 
 export interface WorkflowStepResult {
   label: string
@@ -18,6 +20,24 @@ interface WorkflowRun {
   outputTruncated: boolean
   error: string | null
 }
+
+export const statusColor = (status: string): string => {
+  switch (status) {
+    case 'success':
+      return 'success'
+    case 'running':
+    case 'queued':
+      return 'processing'
+    case 'failed':
+    case 'timed_out':
+      return 'error'
+    case 'interrupted':
+      return 'warning'
+    default:
+      return 'default'
+  }
+}
+
 export const WorkflowRunView = ({ id, active }: { id: string, active: boolean }): React.JSX.Element => {
   const { t } = useTranslation()
   const [run, setRun] = useState<WorkflowRun>()
@@ -51,19 +71,24 @@ export const WorkflowRunView = ({ id, active }: { id: string, active: boolean })
     return () => { abort.abort(); clearTimeout(timer) }
   }, [id, active, step])
   return <section>
-    <h3>{run?.workflowLabel ?? t('command-center.workflows.execution')}</h3>
-    <p>{id} · {t(`command-center.history.status.${run?.status ?? 'queued'}`)}</p>
-    {run?.status === 'queued' && <p>{t('command-center.workflows.queued-help')}</p>}
-    {error !== '' && <p role="alert">{error}</p>}
-    {run?.error != null && <p role="alert">{run.error}</p>}
-    <ol>{run?.workflowSteps?.map((value, index) => <li key={index} style={{ padding: 8 }}>
-      <strong>{value.label}</strong> · <code>{value.command}</code> · {t(`command-center.workflows.step-status.${value.status}`)}
-      {value.exitCode != null && ` (${value.exitCode})`}{' '}
-      {value.historyId !== undefined && <Button onClick={() => { setDetail(undefined); setStep(value.historyId) }}>{t('command-center.workflows.step-output')}</Button>}
-    </li>)}</ol>
-    {step !== undefined && <Button onClick={() => { setStep(undefined); setDetail(undefined) }}>{t('command-center.workflows.all-output')}</Button>}
-    {(detail ?? run)?.outputTruncated === true && <p>{t('command-center.history.truncated')}</p>}
-    <pre aria-label={t('command-center.ui.output')} style={{ background: '#111827', color: '#e5e7eb', padding: 16,
-      whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 500, overflow: 'auto', minHeight: 160 }}>{(step === undefined ? run : detail)?.output || t('command-center.ui.no-output')}</pre>
+    <Flex vertical gap={ 8 }>
+      <Title level={ 3 }>{run?.workflowLabel ?? t('command-center.workflows.execution')}</Title>
+      <Flex align="center" gap={ 8 }>
+        <Text type="secondary">{id}</Text>
+        <Tag color={ statusColor(run?.status ?? 'queued') }>{t(`command-center.history.status.${run?.status ?? 'queued'}`)}</Tag>
+      </Flex>
+      {run?.status === 'queued' && <Text type="secondary" role="status">{t('command-center.workflows.queued-help')}</Text>}
+      {error !== '' && <Alert type="error" message={ error } />}
+      {run?.error != null && <Alert type="error" message={ run.error } />}
+      <StepList items={ (run?.workflowSteps ?? []).map((value, index) => <React.Fragment key={ index }>
+        <Text strong>{value.label}</Text> · <Text code>{value.command}</Text> ·{' '}
+        <Tag color={ statusColor(value.status) }>{t(`command-center.workflows.step-status.${value.status}`)}</Tag>
+        {value.exitCode != null && ` (${value.exitCode})`}{' '}
+        {value.historyId !== undefined && <Button onClick={ () => { setDetail(undefined); setStep(value.historyId) } }>{t('command-center.workflows.step-output')}</Button>}
+      </React.Fragment>) } />
+      {step !== undefined && <Button onClick={ () => { setStep(undefined); setDetail(undefined) } }>{t('command-center.workflows.all-output')}</Button>}
+      {(detail ?? run)?.outputTruncated === true && <Text type="secondary">{t('command-center.history.truncated')}</Text>}
+      <Output text={ (step === undefined ? run : detail)?.output } minHeight={ 160 } maxHeight={ 500 } />
+    </Flex>
   </section>
 }

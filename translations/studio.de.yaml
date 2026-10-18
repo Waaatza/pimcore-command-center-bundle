@@ -192,6 +192,7 @@ command-center.workflows.help: "Führe mehrere Commands im Hintergrund aus. Schr
 command-center.workflows.choose: "Workflow auswählen"
 command-center.workflows.new: "Neuer Workflow"
 command-center.workflows.edit: "Workflow bearbeiten"
+command-center.workflows.steps: "Schritte"
 command-center.workflows.step: "Schritt {{number}}"
 command-center.workflows.up: "Nach oben"
 command-center.workflows.down: "Nach unten"

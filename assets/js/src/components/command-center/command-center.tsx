@@ -1,7 +1,8 @@
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
 import { commandCenterUrl } from './api'
+import { Output } from './output'
 import React, { useEffect, useRef, useState } from 'react'
-import { Button, Content, TextArea, Select, Tabs } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Button, Collapse, Content, Flex, Form, FormKit, Select, Tabs, Text, TextArea, Title } from '@pimcore/studio-ui-bundle/components'
 
 import { Workflows } from './workflows'
 import { CommandTemplates } from './command-templates'
@@ -17,6 +18,8 @@ interface Definition {
   }
 }
 
+const defaultPhpCode = '<?php\n\necho "Hello from Pimcore!\\n";\n'
+
 export const CommandCenter = (): React.JSX.Element => {
   const { t } = useTranslation()
   const [tab, setTab] = useState('direct')
@@ -24,7 +27,7 @@ export const CommandCenter = (): React.JSX.Element => {
 
   return (
     <Content padded padding="large">
-      <h2>{t('command-center.ui.title')}</h2>
+      <Title level={ 2 }>{t('command-center.ui.title')}</Title>
       <Tabs activeKey={ tab } onChange={ setTab } noPadding items={ [
         { key: 'direct', label: t('command-center.tabs.direct'), children: <CommandRunner onDraftChange={ setDraft } /> },
         { key: 'workflows', label: t('command-center.tabs.workflows'), children: <Workflows active={tab === 'workflows'} draft={draft} onScheduled={() => setTab('scheduled')} /> },
@@ -37,14 +40,20 @@ export const CommandCenter = (): React.JSX.Element => {
   )
 }
 
+interface RunnerValues {
+  tokens: string
+  phpCode: string
+}
+
 const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft) => void }): React.JSX.Element => {
   const { t } = useTranslation()
+  const [form] = Form.useForm<RunnerValues>()
+  const [selected, setSelected] = useState<string>()
+  const tokens = Form.useWatch('tokens', form) ?? '[]'
+  const phpCode = Form.useWatch('phpCode', form) ?? ''
+  const inlineScript = selected === 'pimcore:run-script'
   const [csrfToken, setCsrfToken] = useState('')
   const [commands, setCommands] = useState<Definition[]>([])
-  const [selected, setSelected] = useState<string>()
-  const [tokens, setTokens] = useState('[]')
-  const [phpCode, setPhpCode] = useState('<?php\n\necho "Hello from Pimcore!\\n";\n')
-  const inlineScript = selected === 'pimcore:run-script'
   const [output, setOutput] = useState('')
   const [status, setStatus] = useState('ready')
   const [exitCode, setExitCode] = useState<number>()
@@ -130,56 +139,55 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
     }
   }
 
+  const argumentItems = command === undefined ? [] : [
+    ...Object.values(command.definition.arguments).map(arg => (
+      <li key={ arg.name }><Text code>{arg.name}</Text>{arg.is_required ? t('command-center.ui.required') : ''}: {arg.description}</li>
+    )),
+    ...Object.values(command.definition.options).map(option => (
+      <li key={ option.name }><Text code>{option.name}</Text>: {option.description}</li>
+    ))
+  ]
+
   return (
-    <>
-      <div style={ { display: 'flex', flexDirection: 'column', gap: 16, height: '100%' } }>
+    <FormKit wrapInPanel={ false } formProps={ {
+      form, disabled: running, initialValues: { tokens: '[]', phpCode: defaultPhpCode }
+    } }>
+      <Flex vertical gap={ 16 } style={ { height: '100%' } }>
         <Select
           style={ { width: '100%', maxWidth: 'none' } }
           showSearch
           disabled={ running }
-          placeholder={t('command-center.ui.choose-command')}
+          placeholder={ t('command-center.ui.choose-command') }
           value={ selected }
           options={ commands.map(item => ({ value: item.name, label: item.name })) }
-          onChange={ (value: string) => { setSelected(value); setTokens('[]') } }
+          onChange={ (value: string) => { setSelected(value); form.setFieldValue('tokens', '[]') } }
         />
         {command !== undefined && (
-          <details>
-            <summary>{command.description || command.name} – {t('command-center.ui.arguments')}</summary>
-            <ul>
-              {Object.values(command.definition.arguments).map(arg => (
-                <li key={ arg.name }><code>{arg.name}</code>{arg.is_required ? t('command-center.ui.required') : ''}: {arg.description}</li>
-              ))}
-              {Object.values(command.definition.options).map(option => (
-                <li key={ option.name }><code>{option.name}</code>: {option.description}</li>
-              ))}
-            </ul>
-          </details>
+          <Collapse items={ [{
+            key: 'arguments',
+            label: `${command.description || command.name} – ${t('command-center.ui.arguments')}`,
+            children: <ul>{argumentItems}</ul>
+          }] } />
         )}
         {inlineScript && (
-          <>
-            <label htmlFor="command-center-php">{t('command-center.ui.php-code')}</label>
-            <TextArea id="command-center-php" value={ phpCode } disabled={ running }
-              onChange={ event => setPhpCode(event.target.value) } rows={ 12 }
-              spellCheck={ false } style={ { fontFamily: 'monospace' } } />
-            <small>{t('command-center.ui.php-help')}</small>
-          </>
+          <Form.Item label={ t('command-center.ui.php-code') } name="phpCode">
+            <TextArea rows={ 12 } spellCheck={ false } />
+          </Form.Item>
         )}
-        <label htmlFor="command-center-tokens">{inlineScript
+        {inlineScript && <Text type="secondary">{t('command-center.ui.php-help')}</Text>}
+        <Form.Item name="tokens" label={ inlineScript
           ? t('command-center.ui.inline-options')
-          : t('command-center.ui.arguments-json')}</label>
-        <TextArea id="command-center-tokens" value={ tokens } disabled={ running }
-          onChange={ event => setTokens(event.target.value) } rows={ 3 } />
-        <small>{t('command-center.ui.execution-help')}</small>
-        <div>
+          : t('command-center.ui.arguments-json') }>
+          <TextArea rows={ 3 } />
+        </Form.Item>
+        <Text type="secondary">{t('command-center.ui.execution-help')}</Text>
+        <Flex align="center" gap={ 16 }>
           <Button type="primary" disabled={ selected === undefined || running || (inlineScript && phpCode.trim() === '') } onClick={ () => { void run() } }>{t('command-center.ui.execute')}</Button>
-          <span role="status" style={ { marginLeft: 16 } }>{t(`command-center.status.${status}`, { code: exitCode })}</span>
-        </div>
-        {error !== '' && <div role="alert">{error}</div>}
-        <pre ref={ terminal } aria-label={t('command-center.ui.output')} style={ {
-          background: '#111827', color: '#e5e7eb', padding: 16, overflow: 'auto',
-          whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minHeight: 240, flex: 1
-        } }>{output || t('command-center.ui.no-output')}</pre>
-      </div>
-    </>
+          <Text role="status">{t(`command-center.status.${status}`, { code: exitCode })}</Text>
+        </Flex>
+        {error !== '' && <Alert type="error" message={ error } />}
+        <Output ref={ terminal } text={ output } label={ t('command-center.ui.output') } minHeight={ 240 } grow />
+      </Flex>
+    </FormKit>
   )
 }
