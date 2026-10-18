@@ -120,6 +120,7 @@ final readonly class CommandScheduleRunner
                 }
                 $item['revision'] = ($item['revision'] ?? 0) + 1;
                 $due = new \DateTimeImmutable($item['nextRunAt']);
+                $item['localTime'] ??= $due->setTimezone(new \DateTimeZone($item['timezone']))->format('H:i:s');
                 $item['lastRun'] = [
                     'status' => 'running',
                     'scheduledAt' => $item['nextRunAt'],
@@ -128,7 +129,7 @@ final readonly class CommandScheduleRunner
                     'exitCode' => null,
                     'output' => '',
                 ];
-                $item['nextRunAt'] = self::nextRun($due, $item['repeat'], $item['timezone'], $now);
+                $item['nextRunAt'] = self::nextRun($due, $item['repeat'], $item['timezone'], $now, $item['localTime']);
                 if ($item['nextRunAt'] === null) {
                     $item['enabled'] = false;
                 }
@@ -146,6 +147,7 @@ final readonly class CommandScheduleRunner
         string $repeat,
         string $timezone,
         \DateTimeImmutable $now,
+        ?string $localTime = null,
     ): ?string {
         if ($repeat === 'once') {
             return null;
@@ -156,9 +158,13 @@ final readonly class CommandScheduleRunner
             'weekly' => '+1 week',
             default => throw new \InvalidArgumentException('Invalid repeat interval.'),
         };
-        $next = $due->setTimezone(new \DateTimeZone($timezone));
+        $next = $due->setTimezone(new \DateTimeZone($repeat === 'hourly' ? 'UTC' : $timezone));
+        $time = array_map('intval', explode(':', $localTime ?? $next->format('H:i:s')));
         do {
-            $next = $next->modify($step);
+            // Use noon for calendar arithmetic so a missing local hour does not shift later runs.
+            $next = $repeat === 'hourly'
+                ? $next->modify($step)
+                : $next->setTime(12, 0)->modify($step)->setTime(...$time);
         } while ($next <= $now);
 
         return $next->setTimezone(new \DateTimeZone('UTC'))->format(DATE_ATOM);

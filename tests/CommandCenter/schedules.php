@@ -117,6 +117,38 @@ try {
     $check($next === '2026-10-25T07:00:00+00:00', 'Daily schedule shifted local hour at DST boundary');
     $next = CommandScheduleRunner::nextRun($due, 'daily', 'Europe/Berlin', new DateTimeImmutable('2026-10-27T12:00:00Z'));
     $check($next === '2026-10-28T07:00:00+00:00', 'Missed recurrences not coalesced');
+    foreach (['daily' => '2027-03-27', 'weekly' => '2027-03-21'] as $repeat => $date) {
+        $due = new DateTimeImmutable($date . 'T02:30:00+01:00');
+        $gap = CommandScheduleRunner::nextRun($due, $repeat, 'Europe/Berlin', $due, '02:30:00');
+        $check($gap === '2027-03-28T01:30:00+00:00', 'Missing local hour was not normalized');
+        $due = new DateTimeImmutable($gap);
+        $next = CommandScheduleRunner::nextRun($due, $repeat, 'Europe/Berlin', $due, '02:30:00');
+        $expectedDate = $repeat === 'daily' ? '2027-03-29' : '2027-04-04';
+        $check($next === $expectedDate . 'T00:30:00+00:00', 'Local time drifted after the DST gap');
+    }
+    $due = new DateTimeImmutable('2027-03-27T02:30:00+01:00');
+    $next = CommandScheduleRunner::nextRun(
+        $due, 'daily', 'Europe/Berlin', new DateTimeImmutable('2027-03-28T12:00:00Z'), '02:30:00',
+    );
+    $check($next === '2027-03-29T00:30:00+00:00', 'Coalescing across the DST gap shifted local time');
+    foreach ([
+        ['2030-03-30T02:30:00+01:00', 'Europe/Berlin', '2030-04-01T00:30:00+00:00'],
+        ['2035-03-24T02:30:00+01:00', 'Europe/Berlin', '2035-03-26T00:30:00+00:00'],
+        ['2030-03-09T02:30:00-05:00', 'America/New_York', '2030-03-11T06:30:00+00:00'],
+    ] as [$date, $timezone, $expected]) {
+        $due = new DateTimeImmutable($date);
+        for ($day = 0; $day < 2; $day++) {
+            $due = new DateTimeImmutable(CommandScheduleRunner::nextRun($due, 'daily', $timezone, $due, '02:30:00'));
+        }
+        $check($due->format(DATE_ATOM) === $expected, 'Local time drifted in ' . $timezone . ' from ' . $date);
+    }
+    foreach (['2026-10-25T02:30:00+02:00', '2027-03-28T01:30:00+01:00'] as $date) {
+        $due = new DateTimeImmutable($date);
+        $next = CommandScheduleRunner::nextRun($due, 'hourly', 'Europe/Berlin', $due);
+        $check((new DateTimeImmutable($next))->getTimestamp() - $due->getTimestamp() === 3600,
+            'Hourly schedule did not advance by exactly 3600 seconds');
+    }
+    $check(isset($all['recurring']['localTime']), 'Legacy schedule did not retain its local time');
     echo "Command schedule checks passed.\n";
 } finally {
     foreach (glob($directory . '/storage/*') ?: [] as $path) {

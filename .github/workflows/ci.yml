@@ -70,4 +70,5 @@ jobs:
         run: npm install --no-save --package-lock=false --ignore-scripts '@pimcore/studio-ui-bundle@${{ matrix.sdk }}'
       - run: npm run check-translations
       - run: npm run check-types
+      - run: npm run check-template-preview
       - run: npm run build

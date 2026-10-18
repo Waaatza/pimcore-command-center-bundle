@@ -123,7 +123,11 @@ If another administrator or the worker changes the plan after the editor opens, 
 conflict; cancel and reopen the editor to load the latest version. Polling does not overwrite unsaved edits.
 
 Dates are entered/displayed in the browser timezone. Daily/weekly recurrence preserves
-that timezone across daylight-saving transitions.
+the original local time across daylight-saving transitions, in any year. If that time does not exist
+on the transition day, it moves forward by the DST gap for that occurrence only; later runs return to
+the original local time. Hourly recurrence advances by exactly 3,600 seconds, including clock changes.
+Existing plans capture their current local time on their next execution. If an older plan has already
+drifted, edit its next execution to the intended local time once.
 
 Keep the following worker running in the host application's environment:
 
@@ -210,6 +214,7 @@ cd assets
 npm ci
 npm run check-translations
 npm run check-types
+npm run check-template-preview
 npm run build
 ```
 

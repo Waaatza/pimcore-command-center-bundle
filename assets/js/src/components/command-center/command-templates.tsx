@@ -76,7 +76,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
   const [items, setItems] = useState<Template[]>([])
   const [selected, setSelected] = useState<string>()
   const [values, setValues] = useState<Record<string, string>>({})
-  const [preview, setPreview] = useState<Preview>()
+  const [previewSnapshot, setPreview] = useState<{ result: Preview, request: string }>()
   const [editor, setEditor] = useState<Template>()
   const [session, setSession] = useState(0)
   const [tokens, setTokens] = useState('[]')
@@ -89,6 +89,8 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
   const [deletePending, setDeletePending] = useState(false)
   const controller = useRef<AbortController>()
   const item = items.find(value => value.id === selected)
+  const previewRequest = JSON.stringify({ id: item?.id, revision: item?.revision, values })
+  const preview = previewSnapshot?.request === previewRequest ? previewSnapshot.result : undefined
   const watchedFields = Form.useWatch('fields', editorForm) as Field[] | undefined
   useEffect(() => () => { controller.current?.abort() }, [])
   useEffect(() => {
@@ -146,7 +148,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
       if (item?.previewSupported === true) {
         const updated = await post('preview', actionData(), abort.signal)
         const result = await updated.json() as Preview
-        if (!abort.signal.aborted) setPreview(result)
+        if (!abort.signal.aborted) setPreview({ result, request: previewRequest })
       }
     } finally { controller.current = undefined }
   }
@@ -241,7 +243,8 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
           ))}
           <Flex gap={ 12 }>
             <Button disabled={busy || item.previewSupported !== true} onClick={() => { void perform(async () => {
-              const response = await post('preview', actionData()); setPreview(await response.json() as Preview)
+              const response = await post('preview', actionData())
+              setPreview({ result: await response.json() as Preview, request: previewRequest })
             }) }}>{t('command-center.templates.preview')}</Button>
             <Button type="primary" disabled={busy || (item.previewSupported === true && preview?.supported !== true)} onClick={() => { void perform(run) }}>{t('command-center.ui.execute')}</Button>
             <Button disabled={busy} onClick={() => setDeletePending(true)}>{t('command-center.templates.delete')}</Button>

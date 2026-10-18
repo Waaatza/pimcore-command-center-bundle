@@ -67,6 +67,21 @@ $expect = static function (string $type, callable $action): void {
     throw new RuntimeException('Expected ' . $type);
 };
 try {
+    $dst = $service->create(new CommandScheduleParameters(
+        new CommandRunParameters('test:a', $token), 'DST', '2030-03-30T02:30:00+01:00', 'daily', 'Europe/Berlin',
+    ));
+    $check($dst['localTime'] === '02:30:00', 'Schedule creation did not capture the local time');
+    $store->update(static function (array &$items) use ($dst): void {
+        $items[$dst['id']]['nextRunAt'] = '2030-03-31T01:30:00+00:00';
+    });
+    $renamed = $service->update(new CommandScheduleUpdateParameters($dst['id'], new CommandScheduleParameters(
+        new CommandRunParameters('test:a', $token), 'Renamed', '2030-03-31T01:30:00Z', 'daily', 'Europe/Berlin',
+    ), true, 0));
+    $check($renamed['localTime'] === '02:30:00', 'Unchanged execution date overwrote the original local time');
+    $rescheduled = $service->update(new CommandScheduleUpdateParameters($dst['id'], new CommandScheduleParameters(
+        new CommandRunParameters('test:a', $token), 'Rescheduled', '2030-04-01T04:15:00+02:00', 'daily', 'Europe/Berlin',
+    ), true, 1));
+    $check($rescheduled['localTime'] === '04:15:00', 'Explicit rescheduling did not update the local time');
     $created = $service->create(new CommandScheduleParameters(
         new CommandRunParameters('test:a', $token), 'Original', '+1 hour',
     ));

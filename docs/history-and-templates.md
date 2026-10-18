@@ -68,8 +68,10 @@ to non-administrator accounts.
 
 A template shows **Preview affected objects** when its command has a registered preview provider. For these
 templates, first preview the inputs, inspect the count and sample changes, then execute. Changing the
-inputs clears the preview. While a command runs, its previous preview is hidden. After the execution stream
-finishes, a fresh preview is loaded automatically, including after a nonzero exit code so partial changes
+inputs clears the preview. The preview is bound to the selected template ID, revision and input values.
+Reloading a changed template requires a fresh preview; delayed responses for an older revision cannot
+enable execution or appear as current results. While a command runs, its previous preview is hidden.
+After the execution stream finishes, a fresh preview is loaded automatically, including after a nonzero exit code so partial changes
 are reflected. If execution or preview loading fails, the old preview remains hidden. Commands without a provider show that preview is unavailable
 and can still be run normally. A preview is advisory: objects may change before execution and commands must
 re-evaluate their selection. It is not a transaction or a guarantee that every planned write will succeed.

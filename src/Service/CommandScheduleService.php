@@ -88,6 +88,10 @@ final readonly class CommandScheduleService
             if (($item['revision'] ?? 0) !== $parameters->revision) {
                 throw new ConflictHttpException('The schedule has changed. Reload it before saving.');
             }
+            if ($fields['nextRunAt'] === $item['nextRunAt'] && $fields['repeat'] === $item['repeat']
+                && $fields['timezone'] === $item['timezone']) {
+                $fields['localTime'] = $item['localTime'] ?? $fields['localTime'];
+            }
             $items[$parameters->id] = array_replace($item, $fields, [
                 'enabled' => $parameters->enabled,
                 'revision' => ($item['revision'] ?? 0) + 1,
@@ -148,6 +152,7 @@ final readonly class CommandScheduleService
             'phpCode' => $execution->phpCode,
             'repeat' => $parameters->repeat,
             'timezone' => $parameters->timezone,
+            'localTime' => $runAt->setTimezone(new \DateTimeZone($parameters->timezone))->format('H:i:s'),
             'nextRunAt' => $runAt->setTimezone(new \DateTimeZone('UTC'))->format(DATE_ATOM),
             'notificationRecipientIds' => array_values(array_unique($parameters->notificationRecipientIds)),
             'notificationChannels' => array_values(array_unique($parameters->notificationChannels)),
