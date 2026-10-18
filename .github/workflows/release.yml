@@ -68,7 +68,7 @@ jobs:
         run: |
           TITLE="${{ steps.tag.outputs.subject }}"
           if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "$TITLE" --generate-notes
+            gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "$TITLE"
           else
             gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "$TITLE" --generate-notes
           fi
