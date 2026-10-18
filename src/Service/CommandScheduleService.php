@@ -7,11 +7,13 @@ use Pimcore\Bundle\StudioBackendBundle\Security\Service\SecurityServiceInterface
 use Pimcore\Model\User;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Watza\CommandCenterBundle\Parameter\CommandScheduleActionParameters;
 use Watza\CommandCenterBundle\Parameter\CommandScheduleParameters;
+use Watza\CommandCenterBundle\Parameter\CommandScheduleUpdateParameters;
 use Watza\CommandCenterBundle\Parameter\ScheduleNotificationsParameters;
 
 /** @internal */
@@ -54,6 +56,50 @@ final readonly class CommandScheduleService
 
     public function create(CommandScheduleParameters $parameters): array
     {
+        [$fields, $user] = $this->validatedFields($parameters);
+        $item = $fields + [
+            'id' => bin2hex(random_bytes(16)),
+            'enabled' => true,
+            'revision' => 0,
+            'createdAt' => gmdate(DATE_ATOM),
+            'createdBy' => $user->getId(),
+            'lastRun' => null,
+        ];
+        $this->store->update(static function (array &$items) use ($item): void {
+            if (count($items) >= 50) {
+                throw new BadRequestHttpException('Maximum of 50 schedules reached.');
+            }
+            $items[$item['id']] = $item;
+        });
+
+        return $item;
+    }
+
+    public function update(CommandScheduleUpdateParameters $parameters): array
+    {
+        [$fields, $user] = $this->validatedFields($parameters->schedule);
+
+        return $this->store->update(static function (array &$items) use ($parameters, $fields, $user): array {
+            $item = $items[$parameters->id] ?? throw new NotFoundHttpException('Schedule not found.');
+            if (($item['lastRun']['status'] ?? null) === 'running') {
+                throw new ConflictHttpException('A running schedule cannot be edited. Wait until execution finishes.');
+            }
+            if (($item['revision'] ?? 0) !== $parameters->revision) {
+                throw new ConflictHttpException('The schedule has changed. Reload it before saving.');
+            }
+            $items[$parameters->id] = array_replace($item, $fields, [
+                'enabled' => $parameters->enabled,
+                'revision' => ($item['revision'] ?? 0) + 1,
+                'updatedAt' => gmdate(DATE_ATOM),
+                'updatedBy' => $user->getId(),
+            ]);
+
+            return $items[$parameters->id];
+        });
+    }
+
+    private function validatedFields(CommandScheduleParameters $parameters): array
+    {
         $this->checkToken($parameters->execution->csrfToken);
         $this->commands->validate($parameters->execution);
         $this->recipients->validate($parameters->notificationRecipientIds, $parameters->notificationChannels);
@@ -71,8 +117,8 @@ final readonly class CommandScheduleService
         if (!$user instanceof User || !$user->isAdmin()) {
             throw new AccessDeniedHttpException('Administrator access required.');
         }
-        $item = [
-            'id' => bin2hex(random_bytes(16)),
+
+        return [[
             'label' => trim($parameters->label),
             'command' => $parameters->execution->command,
             'tokens' => $parameters->execution->tokens,
@@ -80,21 +126,9 @@ final readonly class CommandScheduleService
             'repeat' => $parameters->repeat,
             'timezone' => $parameters->timezone,
             'nextRunAt' => $runAt->setTimezone(new \DateTimeZone('UTC'))->format(DATE_ATOM),
-            'enabled' => true,
-            'createdAt' => gmdate(DATE_ATOM),
-            'createdBy' => $user->getId(),
             'notificationRecipientIds' => array_values(array_unique($parameters->notificationRecipientIds)),
             'notificationChannels' => array_values(array_unique($parameters->notificationChannels)),
-            'lastRun' => null,
-        ];
-        $this->store->update(static function (array &$items) use ($item): void {
-            if (count($items) >= 50) {
-                throw new BadRequestHttpException('Maximum of 50 schedules reached.');
-            }
-            $items[$item['id']] = $item;
-        });
-
-        return $item;
+        ], $user];
     }
 
     public function action(CommandScheduleActionParameters $parameters): void
@@ -112,6 +146,7 @@ final readonly class CommandScheduleService
                     throw new BadRequestHttpException('This one-time schedule has already run. Create a new schedule.');
                 }
                 $items[$parameters->id]['enabled'] = $parameters->action === 'enable';
+                $items[$parameters->id]['revision'] = ($item['revision'] ?? 0) + 1;
             } else {
                 throw new BadRequestHttpException('Invalid schedule action.');
             }
@@ -126,6 +161,7 @@ final readonly class CommandScheduleService
             if (!isset($items[$parameters->id])) {
                 throw new NotFoundHttpException('Schedule not found.');
             }
+            $items[$parameters->id]['revision'] = ($items[$parameters->id]['revision'] ?? 0) + 1;
             $items[$parameters->id]['notificationRecipientIds'] = array_values(
                 array_unique($parameters->notificationRecipientIds),
             );

@@ -13,3 +13,5 @@ command_center_scheduleaction: Zeitplan aktivieren, deaktivieren oder löschen
 command_center_scheduleaction_success: Zeitplan aktualisiert
 command_center_schedulenotifications: Fehlerbenachrichtigungen konfigurieren
 command_center_schedulenotifications_success: Benachrichtigungseinstellungen gespeichert
+command_center_updateschedule: Zeitplan bearbeiten
+command_center_updateschedule_success: Zeitplan aktualisiert

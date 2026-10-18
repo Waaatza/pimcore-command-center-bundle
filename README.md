@@ -6,7 +6,7 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Stream stdout/stderr and display the exit code.
 - Paste PHP directly for `pimcore:run-script`.
 - Schedule one-time, hourly, daily or weekly executions.
-- Enable/disable/delete plans and inspect the latest output and status.
+- Edit, enable/disable/delete plans and inspect the latest output and status.
 - Administrator access and CSRF protection on mutations.
 
 ## Compatibility
@@ -84,7 +84,13 @@ Inline scripts accept `--dry-run`, verbose and quiet options; do not supply a sc
 3. Enter a name, first execution and recurrence; save the plan.
 
 Each plan stores a separate copy of the arguments and PHP code. Changing the direct-execution form does not
-change saved plans. Dates are entered/displayed in the browser timezone. Daily/weekly recurrence preserves
+change saved plans. Use **Bearbeiten** in the schedule list to update a saved plan's name, command,
+arguments, PHP code, next execution, recurrence, enabled state and failure-notification settings.
+The ID, creation metadata and latest execution result are preserved. Running schedules cannot be edited.
+If another administrator or the worker changes the plan after the editor opens, saving is rejected with a
+conflict; cancel and reopen the editor to load the latest version. Polling does not overwrite unsaved edits.
+
+Dates are entered/displayed in the browser timezone. Daily/weekly recurrence preserves
 that timezone across daylight-saving transitions.
 
 Keep the following worker running in the host application's environment:
@@ -120,7 +126,7 @@ Preserve/share this directory between web and worker and across deployments, and
 Each job retains at most 1 MB of output, with up to 50 stored plans. Output is refreshed while a scheduled job
 runs. This is a latest-result view, not a full execution history.
 
-Completed one-time plans cannot be re-enabled; create a new plan. Disabling a running recurring plan prevents
+Completed one-time plans can be scheduled again with **Bearbeiten**: choose a future execution and set the status to active. Disabling a running recurring plan prevents
 future runs and lets the current run finish. Running plans cannot be deleted.
 A filesystem lock prevents concurrent workers from claiming the same job. After an unexpected worker stop,
 the next worker marks an unfinished job interrupted and disables its schedule. Inspect its effects before

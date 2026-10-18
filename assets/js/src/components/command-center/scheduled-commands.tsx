@@ -1,4 +1,6 @@
 import { commandCenterUrl } from './api'
+import { ScheduleEditor } from './schedule-editor'
+import { NotificationFields, type Recipient } from './notification-fields'
 import React, { useEffect, useState } from 'react'
 import { Button, Input, Select } from '@pimcore/studio-ui-bundle/components'
 
@@ -9,7 +11,6 @@ export interface CommandDraft {
   csrfToken: string
 }
 
-interface Recipient { id: number, name: string, email: string | null, studioAllowed: boolean }
 interface Delivery { userId?: number, channel?: string, status: string, error?: string }
 interface RunResult {
   status: 'running' | 'success' | 'failed' | 'interrupted'
@@ -19,8 +20,9 @@ interface RunResult {
   notifications?: Delivery[]
   output?: string
 }
-interface PlannedCommand {
+export interface PlannedCommand {
   id: string
+  revision?: number
   label: string
   command: string
   tokens?: string[]
@@ -47,6 +49,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
   const [recipientIds, setRecipientIds] = useState<number[]>([])
   const [channels, setChannels] = useState<string[]>([])
   const [items, setItems] = useState<PlannedCommand[]>([])
+  const [editingId, setEditingId] = useState<string>()
   const [detail, setDetail] = useState<PlannedCommand>()
   const [selectedId, setSelectedId] = useState<string>()
   const [label, setLabel] = useState('')
@@ -183,7 +186,11 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
               <td style={ { padding: 12 } }>
                 <Button disabled={ busy || (!item.enabled && item.nextRunAt === null) }
                   onClick={ () => { void action(item, item.enabled ? 'disable' : 'enable') } }>{item.enabled ? 'Deaktivieren' : 'Aktivieren'}</Button>
-                <Button onClick={ () => { setDetail(undefined); setSelectedId(item.id) } }>Details</Button>
+                <Button onClick={ () => { if (selectedId !== item.id) setDetail(undefined); setSelectedId(item.id); setEditingId(undefined) } }>Details</Button>
+                <Button disabled={ busy || item.lastRun?.status === 'running' } onClick={ () => {
+                  if (selectedId !== item.id) setDetail(undefined)
+                  setSelectedId(item.id); setEditingId(item.id)
+                } }>Bearbeiten</Button>
                 <Button danger disabled={ busy || item.lastRun?.status === 'running' }
                   onClick={ () => { void action(item, 'delete') } }>Löschen</Button>
               </td>
@@ -194,8 +201,16 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
       {detail !== undefined && (
         <section>
           <h3>{detail.label}</h3>
-          <NotificationEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
-            onSaved={ () => setRevision(value => value + 1) } />
+          {editingId === detail.id ? (
+            <ScheduleEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
+              onCancel={ () => setEditingId(undefined) }
+              onSaved={ updated => {
+                setDetail(updated); setEditingId(undefined); setNotice('Zeitplan aktualisiert.'); setRevision(value => value + 1)
+              } } />
+          ) : (
+            <NotificationEditor key={ detail.id } item={ detail } recipients={ recipients } csrfToken={ draft.csrfToken }
+              onSaved={ () => setRevision(value => value + 1) } />
+          )}
           {detail.lastRun?.notifications !== undefined && detail.lastRun.notifications.length > 0 && (
             <ul>{detail.lastRun.notifications.map((delivery, index) => (
               <li key={ index }>{delivery.channel === 'email' ? 'E-Mail' : 'Studio'} · Nutzer {delivery.userId ?? '—'}:
@@ -217,24 +232,6 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
 }
 
 
-const NotificationFields = ({ recipients, ids, channels, onIds, onChannels }: {
-  recipients: Recipient[], ids: number[], channels: string[],
-  onIds: (ids: number[]) => void, onChannels: (channels: string[]) => void
-}): React.JSX.Element => (
-  <>
-    <label>Bei Fehlern benachrichtigen</label>
-    <Select mode="multiple" aria-label="Empfänger für Fehlerbenachrichtigungen" value={ ids }
-      placeholder="Keine Benachrichtigung" style={ { width: '100%', maxWidth: 'none' } }
-      optionFilterProp="label" onChange={ onIds }
-      options={ recipients.map(user => ({ value: user.id,
-        label: `${user.name}${user.email ? ` (${user.email})` : ' (ohne E-Mail)'}${user.studioAllowed ? '' : ' · keine Studio-Benachrichtigungen'}` })) } />
-    <Select mode="multiple" aria-label="Benachrichtigungskanäle" value={ channels }
-      placeholder="Kanäle auswählen" style={ { width: '100%', maxWidth: 'none' } } onChange={ onChannels }
-      options={ [{ value: 'email', label: 'E-Mail' }, { value: 'studio', label: 'Studio-Benachrichtigung' }] } />
-    <small>E-Mail benötigt einen konfigurierten Mailversand und eine gültige Nutzeradresse.
-      Studio-Benachrichtigungen benötigen die Berechtigung „notifications“.</small>
-  </>
-)
 
 const NotificationEditor = ({ item, recipients, csrfToken, onSaved }: {
   item: PlannedCommand, recipients: Recipient[], csrfToken: string, onSaved: () => void

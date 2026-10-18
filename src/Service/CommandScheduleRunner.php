@@ -87,6 +87,7 @@ final readonly class CommandScheduleRunner
             foreach ($items as &$item) {
                 if (($item['lastRun']['status'] ?? null) === 'running') {
                     $item['enabled'] = false;
+                    $item['revision'] = ($item['revision'] ?? 0) + 1;
                     $item['lastRun']['status'] = 'interrupted';
                     $item['lastRun']['finishedAt'] = $now->format(DATE_ATOM);
                     $item['lastRun']['output'] .= "\nWorker interrupted. Schedule disabled; check before rescheduling.";
@@ -101,6 +102,7 @@ final readonly class CommandScheduleRunner
                     || new \DateTimeImmutable($item['nextRunAt']) > $now) {
                     continue;
                 }
+                $item['revision'] = ($item['revision'] ?? 0) + 1;
                 $due = new \DateTimeImmutable($item['nextRunAt']);
                 $item['lastRun'] = [
                     'status' => 'running',
