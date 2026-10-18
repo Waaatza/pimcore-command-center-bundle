@@ -16,12 +16,22 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Optional interactive Linux terminal with administrator-only shell sessions in Studio.
 - Administrator access and CSRF protection on mutations.
 
-**Contents:** [Security disclaimer](#security-disclaimer) · [Requirements](#requirements) · [Install](#install) ·
-[Direct execution](#direct-execution) · [Command templates and run history](#command-templates-and-run-history) ·
-[Scheduled executions](#scheduled-executions) · [Workflows](#workflows) · [Failure notifications](#failure-notifications) ·
-[Background worker](#background-worker) · [Interactive terminal](#interactive-terminal) · [Languages](#languages) ·
-[Development](#development) ·
-[Further reading](#further-reading) · [Inspiration disclaimer](#inspiration-disclaimer)
+## Contents
+
+- [Security disclaimer](#security-disclaimer)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Direct execution](#direct-execution)
+- [Command templates and run history](#command-templates-and-run-history)
+- [Scheduled executions](#scheduled-executions)
+- [Workflows](#workflows)
+- [Failure notifications](#failure-notifications)
+- [Background worker](#background-worker)
+- [Interactive terminal](#interactive-terminal)
+- [Languages](#languages)
+- [Development](#development)
+- [Further reading](#further-reading)
+- [Inspiration disclaimer](#inspiration-disclaimer)
 
 ## Security disclaimer
 
@@ -122,25 +132,11 @@ See [Run history and command templates](docs/history-and-templates.md) for field
 
 ## Scheduled executions
 
-1. Select/configure the command in the **Direct execution** tab.
-2. Switch to the **Scheduled executions** tab.
-3. Enter a name, first execution and recurrence; save the plan.
-
-Each plan stores a separate copy of the arguments and PHP code, so changing the direct-execution form does not
-change saved plans. Use **Edit** to update a plan; running plans cannot be edited, and a save that races the
-worker or another administrator is rejected so you reload the latest version first. Completed one-time plans
-can be scheduled again with **Edit** by choosing a future execution.
-
-Dates are entered and displayed in the browser timezone. Daily and weekly recurrence keeps the original local
-time across daylight-saving transitions, in any year; if that time does not exist on the transition day it
-moves forward by the DST gap for that occurrence only. Hourly recurrence advances by exactly 3,600 seconds,
-including clock changes. Existing plans capture their current local time on their next execution.
-
-Plans and their latest results live outside the public directory in `var/command-center/<environment>/` (up to
-50 plans, 1 MB of output each). Keep that directory on shared, persistent storage for web and worker and
-include it in backups. A filesystem lock prevents concurrent workers from claiming the same job; after an
-unexpected worker stop the unfinished job is marked interrupted and its schedule disabled, and it is never
-retried automatically because it may already have modified data.
+Configure the command in the **Direct execution** tab, switch to **Scheduled executions**, and save a name,
+first execution and recurrence (one-time, hourly, daily or weekly). Each plan stores its own copy of the
+arguments and PHP code and keeps its latest result. See
+[Scheduled executions and the background worker](docs/scheduling.md) for editing, timezones, storage and
+retention.
 
 ## Workflows
 
@@ -153,49 +149,21 @@ recovery.
 
 ## Failure notifications
 
-Choose active Pimcore users and **E-Mail**, **Studio-Benachrichtigung**, or both when creating a schedule.
-For an existing schedule, open **Details** and save its notification settings; changes apply to subsequent
-runs, and leaving recipients and channels empty disables alerts. Failed runs (nonzero exit codes, exceptions
-and timeouts) and worker-interrupted runs trigger alerts, successful runs do not. Each alert lists the plan,
-command, status and timestamps, but not the PHP source, arguments or output; inspect the full output in the
-Command Center.
-
-Email uses Pimcore's existing mail configuration, including its sender address and transport, and recipients
-need a valid email address. Studio recipients need the `notifications` permission. Users are checked again at
-send time, so deleted/inactive users and revoked permissions are handled as delivery failures. Delivery
-results appear with the latest run's details; a failed delivery does not rerun the command or block other
-recipients/channels. Deliveries are attempted once with no automatic retry, so a worker crash during delivery
-may leave an alert unsent — command execution is never replayed to send an alert.
+Choose active Pimcore users and **E-Mail**, **Studio-Benachrichtigung**, or both per schedule. Failed and
+worker-interrupted runs notify the recipients; successful runs do not. See
+[Failure notifications](docs/notifications.md) for channels, delivery and permissions.
 
 ## Background worker
 
-Schedules and queued workflow runs execute in a worker. Keep it running in the host application's environment:
+Schedules and queued workflow runs execute in a background worker. Keep it running in the host application's
+environment:
 
 ```sh
 php bin/console messenger:consume scheduler_command_center --memory-limit=250M --time-limit=3600
 ```
 
-Use Supervisor, systemd or your container orchestrator to restart it automatically. For Docker Compose, reuse
-your application's PHP image, environment and project volume, for example:
-
-```yaml
-services:
-  command-center-worker:
-    image: your-project-php-image
-    working_dir: /var/www/html
-    command: ["php", "bin/console", "messenger:consume", "scheduler_command_center", "--memory-limit=250M", "--time-limit=3600"]
-    restart: unless-stopped
-    stop_grace_period: 360s
-    volumes:
-      - .:/var/www/html
-```
-
-The worker must reach your application's database and other services and use the same filesystem
-user/permissions as the web application for `var/command-center`. The Symfony scheduler checks every ten
-seconds and runs jobs serially: overdue recurrences are coalesced into one execution, a long job delays later
-ones, and the tab shows the latest worker heartbeat (its absence means no worker has checked the plans yet).
-Workflows and schedules share one runner lock, so a long workflow delays later plans and a long plan delays
-queued workflows.
+See [Scheduled executions and the background worker](docs/scheduling.md) for a Docker Compose example,
+heartbeat and locking details.
 
 ## Interactive terminal
 
@@ -261,6 +229,9 @@ COMMAND_CENTER_AUTOLOAD=/path/to/project/vendor/autoload.php php tests/CommandCe
   storage details and a preview-provider example.
 - [Workflows](docs/workflows.md) for sequential background runs, queued execution, snapshots and recovery
   after a worker interruption.
+- [Scheduled executions and the background worker](docs/scheduling.md) for editing, timezones, storage,
+  retention and the worker.
+- [Failure notifications](docs/notifications.md) for recipients, channels and delivery.
 
 ## Inspiration disclaimer
 
