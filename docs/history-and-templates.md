@@ -15,7 +15,8 @@ the details of a step offers **Open workflow run** to move back to the combined 
 [Workflows](workflows.md).
 
 Filter by command/label, status (including *Queued*) or trigger (including *Workflow*). The list is paginated (25 runs per page); details show the
-saved input and output. An active history tab refreshes every five seconds. The server updates output
+saved input and output. **Details** opens a dialog with a loading state, error messages, the saved snapshot and output.
+An active history tab refreshes every five seconds. The server updates output
 approximately once a second when output arrives and writes the final result when execution ends.
 Only the last 1 MB of output is retained per run; truncated output is explicitly marked.
 
@@ -24,6 +25,8 @@ schedule, but cannot be reconstructed into a complete history. Runs from an exte
 After an abrupt process/worker termination, an unfinished record becomes **Interrupted** when read after
 ten minutes. Its actual finish time and exit code remain unknown. Commands still have a five-minute timeout.
 Disconnecting a direct/template run stops it when the server detects the disconnect; the history remains.
+
+![Run history](docs/img/run-history.png)
 
 Records are private JSON files in `var/command-center/<environment>/history/`, with compact listing records
 in `history-summary/`. No database migration is required. Keep the entire `var/command-center` directory
@@ -45,6 +48,8 @@ The saved source is executed unchanged and recorded in history. Read resolved in
 inside PHP. Inline scripts accept only dry-run, verbose and quiet argument options, as in direct execution.
 Leaving the PHP field empty keeps the existing script-file argument mode.
 
+![Command templates](docs/img/templates.png)
+
 Enter a label, description and JSON argument tokens. Add input fields using **Add field**:
 
 - **Text** for paths, names or other strings.
@@ -62,7 +67,7 @@ Selecting the template renders ordinary input fields; users do not have to edit 
 Values are substituted into individual argument tokens and are never interpreted by a shell.
 A positional value cannot start with `-`; write options as `--name={{value}}` in a single token.
 The server rejects unknown fields, invalid types, undefined placeholders and protected global options.
-Templates do not support inline PHP source. For PHP scripts, use direct execution or schedules.
+Script templates store their inline PHP source next to the command and reject it for non-script commands.
 
 Templates are stored in `var/command-center/<environment>/templates/catalog.json`. Changes are atomic and
 revision-checked: stale edits, deletions, previews and executions return a conflict instead of using a

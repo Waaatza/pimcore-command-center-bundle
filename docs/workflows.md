@@ -22,6 +22,8 @@ changed definition.
 **Delete workflow** removes only the definition. Queued runs, schedules and history keep the snapshot
 they captured, so past executions remain readable after the definition is gone.
 
+![Workflow editor](docs/img/workflow.png)
+
 ## Queued execution
 
 **Run now** does not execute anything in the browser. It stores a snapshot of the definition in a queue

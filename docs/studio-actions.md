@@ -5,6 +5,8 @@ Administrators configure them under **Command Center → Studio actions**. New a
 no editor grants. The Command Center itself, command definitions, history browser and terminal remain
 administrator-only.
 
+![Studio actions](docs/img/studio-actions.png)
+
 ## Configure a button
 
 1. Create a template or workflow first. Define any input fields it needs.

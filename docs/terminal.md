@@ -7,6 +7,8 @@ bundle configuration and start the dedicated service.
 The shell is as powerful as direct execution — it can change anything in your application — so enable it
 only where you really need it, and treat the service host as part of your application's security boundary.
 
+![Interactive terminal](docs/img/terminal.png)
+
 ## Requirements
 
 - Linux, with a **non-root** user. The service refuses to start on other platforms or as root.

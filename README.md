@@ -117,12 +117,14 @@ echo 'Objects: ' . $listing->getTotalCount() . PHP_EOL;
 The script runs in an initialized Pimcore environment and its temporary file is deleted on success or failure.
 Inline scripts accept `--dry-run`, verbose and quiet options; do not supply a script filename.
 
+![Direct execution](docs/img/direct-execution.png)
+
 ## Command templates and run history
 
 **Templates** turn a configured command into a small form: text, integer and choice fields substitute into the
 JSON argument tokens, so recurring tasks can run without editing JSON. A template whose command has a
-registered preview provider also shows the affected objects before execution. Templates do not support inline
-PHP source; use direct execution or schedules for PHP scripts.
+registered preview provider also shows the affected objects before execution. Templates using
+`pimcore:run-script` can store inline PHP source, which is executed unchanged and recorded with the run.
 
 **Run history** records every new execution (direct, inline, scheduled, template and workflow runs) with
 status, trigger and a snapshot of input and combined output, plus filters and pagination. Only the last 1 MB
@@ -198,6 +200,7 @@ cd assets
 npm ci
 npm run check-translations
 npm run check-types
+npm run check-history
 npm run check-template-preview
 npm run check-terminal
 npm run check-studio-actions
