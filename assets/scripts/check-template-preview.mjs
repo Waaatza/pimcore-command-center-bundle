@@ -58,6 +58,7 @@ runInNewContext(compiled, {
     if (name === '@pimcore/studio-ui-bundle/components') return components
     if (name === '@tanstack/react-table') return { createColumnHelper }
     if (name === './api') return { commandCenterUrl: path => path }
+    if (name === './command-templates.styles') return { tooltipButtonStyle: { display: 'inline-flex' } }
     if (name === './input-fields') return { InputFieldEditor: 'InputFieldEditor' }
     if (name === './output') return { Output: 'Output' }
     throw new Error(`Unexpected import: ${name}`)

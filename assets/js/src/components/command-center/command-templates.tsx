@@ -4,6 +4,7 @@ import { Alert, Block, Button, Flex, Form, FormKit, Grid, Input, Select, Tag, Te
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { commandCenterUrl } from './api'
 import { Output } from './output'
+import { tooltipButtonStyle } from './command-templates.styles'
 import { InputFieldEditor as TemplateFieldRow, type InputField as Field } from './input-fields'
 import { type CommandDraft } from './scheduled-commands'
 
@@ -156,24 +157,24 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
   }
   const columns: ColumnDef<any, any>[] = [
     columnHelper.accessor('label', {
-      header: t('command-center.templates.label'), size: 260,
+      header: t('command-center.templates.label'), size: 320, meta: { autoWidth: true },
       cell: info => <Flex vertical gap={ 0 }>
         <Text>{ info.getValue() }</Text>
         <Text code>{ info.row.original.command }</Text>
       </Flex>
     }),
     columnHelper.display({
-      id: 'fields', header: t('command-center.templates.fields'), size: 120,
+      id: 'fields', header: t('command-center.templates.fields'), size: 110,
       cell: info => <Text type={ info.row.original.fields.length === 0 ? 'secondary' : undefined }>{ info.row.original.fields.length }</Text>
     }),
     columnHelper.display({
-      id: 'preview', header: t('command-center.templates.preview-short'), size: 140,
+      id: 'preview', header: t('command-center.templates.preview-short'), size: 120,
       cell: info => info.row.original.previewSupported === true
         ? <Tag color="success">{ t('command-center.ui.yes') }</Tag>
         : <Tag>{ t('command-center.ui.no') }</Tag>
     }),
     columnHelper.display({
-      id: 'actions', header: t('command-center.ui.actions'), size: 260,
+      id: 'actions', header: t('command-center.ui.actions'), size: 420,
       cell: info => {
         const value = info.row.original
         const runHint = value.previewSupported === true
@@ -181,7 +182,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
           : (value.fields.length > 0 ? t('command-center.templates.run-fields-hint') : undefined)
         return <Flex gap={ 8 } wrap align="center">
           <Tooltip title={ runHint }>
-            <span>
+            <span style={ tooltipButtonStyle }>
               <Button type="primary" disabled={ busy || runHint !== undefined }
                 onClick={() => runFromRow(value) }>{t('command-center.ui.execute')}</Button>
             </span>
@@ -206,7 +207,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
     </Flex>
     {error !== '' && <Alert type="error" message={ error } />}
     {items.length === 0 && <Text type="secondary">{t('command-center.templates.empty')}</Text>}
-    <Grid columns={ columns } data={ items } size="small" />
+    <Grid autoWidth columns={ columns } data={ items } size="small" />
     {editor !== undefined ? (
       <FormKit key={ session } wrapInPanel={ false } formProps={ { form: editorForm, disabled: busy, initialValues: { fields: editor.fields } } }>
         <Flex vertical gap={ 12 }>
