@@ -118,7 +118,7 @@ const render = (active = true) => {
 const nodes = tree => {
   if (Array.isArray(tree)) return tree.flatMap(nodes)
   if (!React.isValidElement(tree)) return []
-  return [tree, ...nodes(tree.props.children)]
+  return [tree, ...nodes(tree.props.children), ...nodes(tree.props.footer)]
 }
 const button = (tree, key) => nodes(tree).find(node => node.type === 'Button' && node.props.children === key)
 const rowItem = (tree, index = 0) => nodes(tree).find(node => node.type === 'Grid').props.data[index]

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Button, Collapse, Content, Flex, Grid, Modal, SearchInput, Select, Tag, Text, Title } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Button, Collapse, Content, Flex, Grid, SearchInput, Select, Tag, Text, Title, WindowModal } from '@pimcore/studio-ui-bundle/components'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { WorkflowRunView, statusColor } from './workflow-run'
 import { Output } from './output'
@@ -136,7 +136,7 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
       <Text>{page} / {Math.max(1, Math.ceil(total / 25))} ({total})</Text>
       <Button disabled={page * 25 >= total} onClick={() => setPage(value => value + 1)}>{t('command-center.history.next')}</Button>
     </Flex>
-    {selected !== undefined && <Modal open={active} size="L" title={t('command-center.history.details')}
+    {selected !== undefined && <WindowModal open={active} size="L" limitContentHeight title={t('command-center.history.details')}
       onCancel={closeDetail} footer={<Button onClick={closeDetail}>{t('command-center.actions.close')}</Button>}>
       {detailError !== '' && <Alert type="error" message={detailError} />}
       {detail === undefined && detailError === '' && <Content loading />}
@@ -158,6 +158,6 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
         {detail.outputTruncated === true && <Text type="secondary">{t('command-center.history.truncated')}</Text>}
         <Output text={ detail.output } minHeight={ 160 } maxHeight={ 500 } />
       </Flex>}
-    </Modal>}
+    </WindowModal>}
   </Flex>
 }

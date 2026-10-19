@@ -65,7 +65,7 @@ const render = (active = true) => {
 }
 const nodes = tree => Array.isArray(tree) ? tree.flatMap(nodes)
   : React.isValidElement(tree) ? [tree, ...nodes(tree.props.children), ...nodes(tree.props.footer)] : []
-const modal = tree => nodes(tree).find(node => node.type === 'Modal')
+const modal = tree => nodes(tree).find(node => node.type === 'WindowModal')
 const choose = (tree, id) => {
   const grid = nodes(tree).find(node => node.type === 'Grid')
   grid.props.columns.find(column => column.id === 'details').cell({ row: { original: { id } } }).props.onClick()

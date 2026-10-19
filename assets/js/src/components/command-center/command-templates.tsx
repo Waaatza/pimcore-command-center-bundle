@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Block, Button, Flex, Form, FormKit, Grid, Input, Select, Tag, Text, TextArea, Title, Tooltip, useAlertModal } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Block, Button, Flex, Form, FormKit, Grid, Input, Select, Tag, Text, TextArea, Title, Tooltip, useAlertModal, WindowModal } from '@pimcore/studio-ui-bundle/components'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { commandCenterUrl } from './api'
 import { Output } from './output'
@@ -82,6 +82,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
     try { await action() } catch (reason) { setError(String(reason)) } finally { setBusy(false) }
   }
   const edit = (value: Template): void => {
+    setSelected(undefined)
     setEditor({ ...value, fields: value.fields.map(field => ({ ...field })) }); setTokens(JSON.stringify(value.tokens, null, 2)); setSession(current => current + 1)
   }
   const open = (value: Template): void => {
@@ -194,6 +195,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
       }
     })
   ]
+  const closeDetails = (): void => { setSelected(undefined) }
   return <Flex vertical gap={ 16 }>
     <Text type="secondary">{t('command-center.templates.help')}</Text>
     <Flex gap={ 12 } justify="flex-end">
@@ -205,10 +207,18 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
         } catch (reason) { setError(String(reason)) }
       }}>{t('command-center.templates.from-draft')}</Button>
     </Flex>
-    {error !== '' && <Alert type="error" message={ error } />}
+    {error !== '' && editor === undefined && item === undefined && <Alert type="error" message={ error } />}
     {items.length === 0 && <Text type="secondary">{t('command-center.templates.empty')}</Text>}
     <Grid autoWidth columns={ columns } data={ items } size="small" />
-    {editor !== undefined ? (
+    {busy && <Text role="status">{t('command-center.status.running-progress')}</Text>}
+    {editor !== undefined && <WindowModal open={ active } size="L" limitContentHeight
+      title={ editor.id === undefined ? t('command-center.templates.new') : t('command-center.templates.edit') }
+      onCancel={ () => { if (!busy) setEditor(undefined) } }
+      footer={ <Flex gap={ 12 } justify="flex-end">
+        <Button disabled={ busy } onClick={() => setEditor(undefined)}>{t('command-center.templates.cancel')}</Button>
+        <Button type="primary" disabled={busy || editor.label.trim() === '' || editor.command === ''} onClick={ save }>{t('command-center.templates.save')}</Button>
+      </Flex> }>
+      {error !== '' && <Alert type="error" message={ error } />}
       <FormKit key={ session } wrapInPanel={ false } formProps={ { form: editorForm, disabled: busy, initialValues: { fields: editor.fields } } }>
         <Flex vertical gap={ 12 }>
           <Form.Item label={ t('command-center.templates.label') }>
@@ -236,13 +246,13 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
               { ({ blockIndex }) => <TemplateFieldRow field={ watchedFields?.[blockIndex] } /> }
             </Block>
           </Form.Item>
-          <Flex gap={ 12 }>
-            <Button type="primary" disabled={busy || editor.label.trim() === '' || editor.command === ''} onClick={ save }>{t('command-center.templates.save')}</Button>
-            <Button disabled={busy} onClick={() => setEditor(undefined)}>{t('command-center.templates.cancel')}</Button>
-          </Flex>
         </Flex>
       </FormKit>
-    ) : item !== undefined && (
+    </WindowModal>}
+    {item !== undefined && <WindowModal open={ active } size="L" limitContentHeight title={ t('command-center.ui.details') }
+      onCancel={ () => { if (!busy) closeDetails() } }
+      footer={ <Button disabled={ busy } onClick={ closeDetails }>{t('command-center.actions.close')}</Button> }>
+      {error !== '' && <Alert type="error" message={ error } />}
       <FormKit wrapInPanel={ false } formProps={ { disabled: busy } }>
         <Flex vertical gap={ 8 }>
           <Title level={ 3 }>{item.label}</Title>
@@ -280,8 +290,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
           )}
         </Flex>
       </FormKit>
-    )}
-    {busy && <Text role="status">{t('command-center.status.running-progress')}</Text>}
-    {output !== '' && <Output text={ output } label={ t('command-center.ui.output') } minHeight={ 120 } maxHeight={ 500 } />}
+      {output !== '' && <Output text={ output } label={ t('command-center.ui.output') } minHeight={ 120 } maxHeight={ 500 } />}
+    </WindowModal>}
   </Flex>
 }

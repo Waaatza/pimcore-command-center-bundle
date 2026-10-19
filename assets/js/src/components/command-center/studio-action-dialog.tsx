@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Button, Content, Flex, Form, FormKit, Icon, Modal, Tag, Text } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Button, Content, Flex, Form, FormKit, Icon, Tag, Text, WindowModal } from '@pimcore/studio-ui-bundle/components'
 import { ActionHttpError, actionFetch, type ActionRequest, type ActionResult, type PreparedAction } from './studio-actions-api'
 import { InputFields } from './input-fields'
 import { Output } from './output'
@@ -124,7 +124,9 @@ export const StudioActionDialog = ({ request, onClose }: {
     } catch { setError(t('command-center.actions.error')) } finally { setBusy(false) }
   }
 
-  return <Modal open
+  return <WindowModal open
+    size="L"
+    limitContentHeight
     title={ <Flex align="center" gap={ 8 }>
       { prepared !== undefined && <Icon value={ prepared.icon } type={ prepared.iconType ?? 'name' } /> }
       <span>{ prepared?.label ?? t('command-center.actions.run') }</span>
@@ -166,5 +168,5 @@ export const StudioActionDialog = ({ request, onClose }: {
       </Flex> }
       { output !== '' && <Output text={ output } label={ t('command-center.ui.output') } maxHeight={ 320 } /> }
     </Flex>
-  </Modal>
+  </WindowModal>
 }

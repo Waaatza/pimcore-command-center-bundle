@@ -43,7 +43,7 @@ all workers and web instances must see the same files and support atomic rename/
 
 In **Templates**, the overview lists every template with its command, input-field count and preview
 support. Create one with **New template** or use **From direct execution** to copy a configured command;
-**Details** opens the run panel, **Edit** the editor and **Delete** asks for confirmation first.
+**Details** opens the run window, **Edit** opens the editor window and **Delete** asks for confirmation first.
 Every row also offers **Run**; templates that need a preview or input fields keep it disabled and point to
 the details, where the command is previewed or configured before execution.
 For `pimcore:run-script`, an additional PHP field accepts inline source, including code copied from direct execution.

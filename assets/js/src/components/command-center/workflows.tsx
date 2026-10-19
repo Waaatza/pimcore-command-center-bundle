@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Block, Button, Flex, Form, FormKit, Grid, Input, Select, Text, TextArea, Title, Tooltip, useAlertModal } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Block, Button, Flex, Form, FormKit, Grid, Input, Select, Text, TextArea, Title, Tooltip, useAlertModal, WindowModal } from '@pimcore/studio-ui-bundle/components'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { commandCenterUrl } from './api'
 import { type CommandDraft } from './scheduled-commands'
@@ -126,6 +126,7 @@ export const Workflows = ({ active, draft, onScheduled }: {
     editorForm.setFieldValue('steps', patched)
   }
   const edit = (workflow?: Workflow): void => {
+    setSelected(undefined)
     setScheduling(false)
     const steps = workflow === undefined
       ? [emptyStep()]
@@ -225,15 +226,27 @@ export const Workflows = ({ active, draft, onScheduled }: {
       }
     })
   ]
+  const closeDetails = (): void => { setSelected(undefined) }
   return <Flex vertical gap={ 16 }>
     <Text type="secondary">{t('command-center.workflows.help')}</Text>
     <Flex gap={ 12 } justify="flex-end">
       <Button disabled={busy} onClick={() => edit()}>{t('command-center.workflows.new')}</Button>
     </Flex>
-    {error !== '' && <Alert type="error" message={ error } />}
+    {error !== '' && editor === undefined && item === undefined && <Alert type="error" message={ error } />}
     {items.length === 0 && <Text type="secondary">{t('command-center.workflows.empty')}</Text>}
     <Grid autoWidth columns={ columns } data={ items } size="small" />
-    {editor !== undefined ? (
+    {busy && <Text role="status">{t('command-center.status.running-progress')}</Text>}
+    {editor !== undefined && <WindowModal open={ active } size="L" limitContentHeight
+      title={ editor.id === undefined ? t('command-center.workflows.new') : t('command-center.workflows.edit') }
+      onCancel={ () => { if (!busy) setEditor(undefined) } }
+      footer={ <Flex align="center" justify="space-between">
+        <Button disabled={busy || (watchedSteps?.length ?? 0) >= 20 || draft.command === undefined} onClick={ appendDraftStep }>{t('command-center.workflows.from-draft')}</Button>
+        <Flex gap={ 12 }>
+          <Button disabled={busy} onClick={() => setEditor(undefined)}>{t('command-center.templates.cancel')}</Button>
+          <Button type="primary" disabled={busy || watchedLabel.trim() === '' || !stepsReady} onClick={ save }>{t('command-center.workflows.save')}</Button>
+        </Flex>
+      </Flex> }>
+      {error !== '' && <Alert type="error" message={ error } />}
       <FormKit key={ session } wrapInPanel={ false } formProps={ { form: editorForm, disabled: busy, initialValues: initial, onValuesChange } }>
         <Flex vertical gap={ 12 }>
           <Form.Item label={ t('command-center.templates.label') } name="label">
@@ -254,14 +267,13 @@ export const Workflows = ({ active, draft, onScheduled }: {
               { ({ blockIndex }) => <WorkflowStepRow step={ watchedSteps?.[blockIndex] } commands={ commands } /> }
             </Block>
           </Form.Item>
-          <Flex gap={ 12 } wrap>
-            <Button disabled={busy || (watchedSteps?.length ?? 0) >= 20 || draft.command === undefined } onClick={ appendDraftStep }>{t('command-center.workflows.from-draft')}</Button>
-            <Button type="primary" disabled={busy || watchedLabel.trim() === '' || !stepsReady} onClick={ save }>{t('command-center.workflows.save')}</Button>
-            <Button disabled={busy} onClick={() => setEditor(undefined)}>{t('command-center.templates.cancel')}</Button>
-          </Flex>
         </Flex>
       </FormKit>
-    ) : item !== undefined && (
+    </WindowModal>}
+    {item !== undefined && <WindowModal open={ active } size="L" limitContentHeight title={ t('command-center.ui.details') }
+      onCancel={ () => { if (!busy) closeDetails() } }
+      footer={ <Button disabled={ busy } onClick={ closeDetails }>{t('command-center.actions.close')}</Button> }>
+      {error !== '' && <Alert type="error" message={ error } />}
       <Flex vertical gap={ 12 }>
         <Title level={ 3 }>{item.label}</Title>
         <Text>{item.description}</Text>
@@ -301,8 +313,8 @@ export const Workflows = ({ active, draft, onScheduled }: {
             </FormKit.Panel>
           </FormKit>
         )}
+        {runId !== undefined && <WorkflowRunView id={runId} active={active} />}
       </Flex>
-    )}
-    {runId !== undefined && <WorkflowRunView id={runId} active={active} />}
+    </WindowModal>}
   </Flex>
 }
