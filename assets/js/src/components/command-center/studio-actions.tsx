@@ -84,14 +84,14 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
   }
   const columns: ColumnDef<any, any>[] = [
     columnHelper.display({
-      id: 'label', header: t('command-center.templates.label'), size: 220,
+      id: 'label', header: t('command-center.templates.label'), size: 180,
       cell: info => <Flex align="center" gap={ 8 }>
         <Icon value={ info.row.original.icon } type={ info.row.original.iconType ?? 'name' } />
         <Text>{ info.row.original.label }</Text>
       </Flex>
     }),
     columnHelper.display({
-      id: 'target', header: t('command-center.actions.target'), size: 200,
+      id: 'target', header: t('command-center.actions.target'), size: 160,
       cell: info => {
         const item = info.row.original
         const found = (item.targetType === 'template' ? catalog?.templates : catalog?.workflows)?.find(value => value.id === item.targetId)
@@ -99,13 +99,13 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
       }
     }),
     columnHelper.display({
-      id: 'placements', header: t('command-center.actions.placements'), size: 200,
+      id: 'placements', header: t('command-center.actions.placements'), size: 150,
       cell: info => <Flex gap={ 4 } wrap>
         { info.row.original.placements.map(place => <Tag key={ place }>{ t(`command-center.actions.placement.${ place }`) }</Tag>) }
       </Flex>
     }),
     columnHelper.display({
-      id: 'grants', header: t('command-center.actions.section.grants'), size: 200, meta: { autoWidth: true },
+      id: 'grants', header: t('command-center.actions.section.grants'), size: 150, meta: { autoWidth: true },
       cell: info => {
         const item = info.row.original
         if (item.userIds.length === 0 && item.roleIds.length === 0) {
@@ -119,14 +119,14 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
       }
     }),
     columnHelper.display({
-      id: 'status', header: t('command-center.ui.status'), size: 130,
+      id: 'status', header: t('command-center.ui.status'), size: 100,
       cell: info => <Tag color={ info.row.original.enabled ? 'success' : 'default' }>
         { info.row.original.enabled ? t('command-center.status.active') : t('command-center.status.disabled') }
       </Tag>
     }),
-    columnHelper.accessor('position', { header: t('command-center.actions.position'), size: 90 }),
+    columnHelper.accessor('position', { header: t('command-center.actions.position'), size: 70 }),
     columnHelper.display({
-      id: 'actions', header: t('command-center.ui.actions'), size: 180,
+      id: 'actions', header: t('command-center.ui.actions'), size: 210,
       cell: info => <Flex gap={ 8 }>
         <Button disabled={ busy }
           onClick={ () => { setEditor({ ...info.row.original }); setError(''); setNotice('') } }>{ t('command-center.ui.edit') }</Button>

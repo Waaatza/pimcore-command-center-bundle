@@ -158,32 +158,32 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
 
   const columns: ColumnDef<any, any>[] = [
     columnHelper.accessor('label', {
-      header: t('command-center.ui.name-command'), size: 220, meta: { autoWidth: true },
+      header: t('command-center.ui.name-command'), size: 180, meta: { autoWidth: true },
       cell: info => <Flex vertical gap={ 0 }>
         <Text>{info.getValue()}</Text>
         <Text code>{info.row.original.workflow?.label ?? info.row.original.command}</Text>
       </Flex>
     }),
     columnHelper.accessor('repeat', {
-      header: t('command-center.ui.repeat'), size: 130,
+      header: t('command-center.ui.repeat'), size: 120,
       cell: info => <Flex vertical gap={ 0 }>
         <Text>{repeatLabels[info.getValue() as keyof typeof repeatLabels]}</Text>
         <Text type="secondary">{info.row.original.timezone}</Text>
       </Flex>
     }),
     columnHelper.accessor('nextRunAt', {
-      header: t('command-center.ui.next-execution'), size: 180,
+      header: t('command-center.ui.next-execution'), size: 160,
       cell: info => formatDate(info.getValue())
     }),
     columnHelper.display({
-      id: 'status', header: t('command-center.ui.status'), size: 130,
+      id: 'status', header: t('command-center.ui.status'), size: 110,
       cell: info => {
         const value = scheduleStatus(info.row.original)
         return <Tag color={ value.color }>{value.label}</Tag>
       }
     }),
     columnHelper.display({
-      id: 'lastResult', header: t('command-center.ui.last-result'), size: 200,
+      id: 'lastResult', header: t('command-center.ui.last-result'), size: 160,
       cell: info => {
         const run = info.row.original.lastRun
         if (run === null) return <Text type="secondary">{t('command-center.ui.not-run')}</Text>
@@ -194,7 +194,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
       }
     }),
     columnHelper.display({
-      id: 'actions', header: t('command-center.ui.actions'), size: 340,
+      id: 'actions', header: t('command-center.ui.actions'), size: 290,
       cell: info => {
         const item = info.row.original
         return <Flex gap={ 8 } wrap>
