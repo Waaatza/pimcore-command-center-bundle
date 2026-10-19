@@ -77,10 +77,17 @@ jobs:
           BODY: ${{ steps.tag.outputs.body }}
         run: |
           TAG="${{ github.ref_name }}"
-          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release edit "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --notes "$BODY"
-          elif [ -n "$BODY" ]; then
-            gh release create "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --notes "$BODY"
+          # A version with a pre-release suffix (e.g. 0.9.0-rc.1) ships as a pre-release draft:
+          # it is not final, may still change and stays hidden until it is published manually.
+          if printf '%s' "$TAG" | grep -q -- '-'; then
+            FLAGS="--prerelease --draft"
           else
-            gh release create "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --generate-notes
+            FLAGS=""
+          fi
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --notes "$BODY" $FLAGS
+          elif [ -n "$BODY" ]; then
+            gh release create "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --notes "$BODY" $FLAGS
+          else
+            gh release create "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --generate-notes $FLAGS
           fi

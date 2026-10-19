@@ -71,6 +71,13 @@ composer config repositories.command-center vcs https://github.com/Waaatza/pimco
 composer require watza/command-center-bundle:^0.8
 ```
 
+The current `0.9.0-rc.1` is a **pre-release**: it is published as an unstable draft, may still change and is
+not selected by a stable `^0.8`/`^0.9` constraint. Install it explicitly when you want to test it:
+
+```sh
+composer require watza/command-center-bundle:0.9.0-rc.1
+```
+
 Register the bundle in `config/bundles.php` if your installation did not register it automatically:
 
 ```php
