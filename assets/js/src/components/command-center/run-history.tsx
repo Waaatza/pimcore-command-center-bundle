@@ -88,7 +88,7 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
       id: 'started', header: t('command-center.history.started'), size: 180
     }),
     columnHelper.accessor('command', {
-      header: t('command-center.history.command'), size: 240,
+      header: t('command-center.history.command'), size: 240, meta: { autoWidth: true },
       cell: info => <Flex vertical gap={ 0 }>
         <Text code>{info.getValue()}</Text>
         <Text type="secondary">{info.row.original.workflowLabel ?? info.row.original.scheduleLabel ?? info.row.original.templateLabel}</Text>
@@ -129,7 +129,7 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
       <Button onClick={() => setRefresh(value => value + 1)}>{t('command-center.history.refresh')}</Button>
     </Flex>
     {error !== '' && <Alert type="error" message={ error } />}
-    <Grid columns={ columns } data={ items } size="small" />
+    <Grid autoWidth columns={ columns } data={ items } size="small" />
     {items.length === 0 && <Text type="secondary">{t('command-center.history.empty')}</Text>}
     <Flex gap={ 12 } align="center">
       <Button disabled={page <= 1} onClick={() => setPage(value => value - 1)}>{t('command-center.history.previous')}</Button>

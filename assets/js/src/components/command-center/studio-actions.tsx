@@ -105,7 +105,7 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
       </Flex>
     }),
     columnHelper.display({
-      id: 'grants', header: t('command-center.actions.section.grants'), size: 200,
+      id: 'grants', header: t('command-center.actions.section.grants'), size: 200, meta: { autoWidth: true },
       cell: info => {
         const item = info.row.original
         if (item.userIds.length === 0 && item.roleIds.length === 0) {
@@ -145,7 +145,7 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
     {catalog === undefined && error === '' && <Content loading />}
     {catalog !== undefined && <>
       {catalog.items.length === 0 && <Text type="secondary">{ t('command-center.actions.empty') }</Text>}
-      <Grid columns={ columns } data={ catalog.items } size="small" />
+      <Grid autoWidth columns={ columns } data={ catalog.items } size="small" />
     </>}
     {editor !== undefined && <FormKit wrapInPanel={ false } formProps={ { disabled: busy } }>
       <FormKit.Panel theme="fieldset" title={ t('command-center.actions.section.general') }>

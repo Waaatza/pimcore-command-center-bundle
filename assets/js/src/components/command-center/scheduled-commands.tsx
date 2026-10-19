@@ -158,7 +158,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
 
   const columns: ColumnDef<any, any>[] = [
     columnHelper.accessor('label', {
-      header: t('command-center.ui.name-command'), size: 220,
+      header: t('command-center.ui.name-command'), size: 220, meta: { autoWidth: true },
       cell: info => <Flex vertical gap={ 0 }>
         <Text>{info.getValue()}</Text>
         <Text code>{info.row.original.workflow?.label ?? info.row.original.command}</Text>
@@ -248,7 +248,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
       {notice !== '' && <Alert type="success" message={ notice } />}
       <Title level={ 3 }>{t('command-center.ui.saved-schedules')}</Title>
       {items.length === 0 && <Text type="secondary">{t('command-center.ui.no-schedules')}</Text>}
-      <Grid columns={ columns } data={ items } size="small" />
+      <Grid autoWidth columns={ columns } data={ items } size="small" />
       {detail !== undefined && (
         <section>
           <Flex vertical gap={ 8 }>
