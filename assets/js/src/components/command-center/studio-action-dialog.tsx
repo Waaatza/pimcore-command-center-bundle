@@ -40,35 +40,8 @@ export const StudioActionDialog = ({ request, onClose }: {
     abort.current = controller
     try {
       const response = await actionFetch('run', { ...request, values }, controller.signal)
-      if ((response.headers.get('Content-Type') ?? '').includes('application/json')) {
-        const queued = await response.json() as { id: string }
-        setResult({ id: queued.id, status: 'queued', steps: [] })
-      } else {
-        if (response.body === null) throw new Error()
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        let pending = '', runId = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          pending += decoder.decode(value, { stream: !done })
-          const lines = pending.split('\n'); pending = lines.pop() ?? ''
-          for (const line of lines) {
-            if (line === '') continue
-            const event = JSON.parse(line) as { type: string, id?: string, code?: number, text?: string }
-            if (event.type === 'run') {
-              runId = event.id ?? ''
-              if (mounted.current) setResult({ id: runId, status: 'running', steps: [] })
-            } else if (event.type === 'out' || event.type === 'err') {
-              if (mounted.current) setOutput(previous => (previous + (event.text ?? '')).slice(-1000000))
-            } else if (event.type === 'error') {
-              if (mounted.current) setResult({ id: runId, status: 'failed', steps: [] })
-            } else if (event.type === 'exit' && mounted.current) {
-              setResult({ id: runId, status: event.code === 0 ? 'success' : 'failed', exitCode: event.code, steps: [] })
-            }
-          }
-          if (done) break
-        }
-      }
+      const queued = await response.json() as { id: string }
+      if (mounted.current) setResult({ id: queued.id, status: 'queued', steps: [] })
     } catch (error) {
       if (mounted.current) {
         // Nur bestätigte Ablehnungen erlauben einen neuen Start; Netzwerkfehler können einen laufenden Job betreffen.
@@ -96,7 +69,7 @@ export const StudioActionDialog = ({ request, onClose }: {
   }, [prepared])
 
   useEffect(() => {
-    if (result?.status !== 'queued' && !(result?.status === 'running' && prepared?.targetType === 'workflow')) return
+    if (result?.status !== 'queued' && result?.status !== 'running') return
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout>
     const poll = async (): Promise<void> => {

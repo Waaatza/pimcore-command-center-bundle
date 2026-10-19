@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Watza\CommandCenterBundle\Service;
 
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Process\PhpExecutableFinder;
@@ -26,6 +25,7 @@ final readonly class CommandCenterService
         private string $environment,
         private ?CommandHistoryStore $history = null,
         private ?SecurityServiceInterface $security = null,
+        private ?CommandRunQueue $runs = null,
     ) {
     }
 
@@ -46,7 +46,7 @@ final readonly class CommandCenterService
         return json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
     }
 
-    public function run(CommandRunParameters $parameters, array $context = [], bool $hideOutput = false): StreamedResponse
+    public function queue(CommandRunParameters $parameters, array $context = []): array
     {
         $this->verifyCsrf($parameters->csrfToken);
         $this->validate($parameters);
@@ -54,36 +54,11 @@ final readonly class CommandCenterService
         $user = $this->security?->getCurrentUser();
         $context = array_replace(['source' => 'manual', 'actorId' => $user?->getId(),
             'actorName' => $user?->getName()], $context);
+        if ($this->runs === null) {
+            throw new \RuntimeException('Run queue is unavailable.');
+        }
 
-        return new StreamedResponse(function () use ($parameters, $context, $hideOutput): void {
-            set_time_limit(330);
-            $previousIgnoreAbort = ignore_user_abort(true);
-            $emit = static function (array $event) use ($hideOutput): void {
-                if ($hideOutput && isset($event['text'])) {
-                    if ($event['type'] !== 'error') return;
-                    $event['text'] = 'Action failed.';
-                }
-                echo json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR) . "\n";
-                if (ob_get_level() > 0) {
-                    ob_flush();
-                }
-                flush();
-            };
-            try {
-                $this->executeValidated($parameters, static function (array $event) use ($emit): void {
-                    $emit($event);
-                    if (connection_aborted()) {
-                        throw new \RuntimeException('Client disconnected.');
-                    }
-                }, $context);
-            } finally {
-                ignore_user_abort((bool) $previousIgnoreAbort);
-            }
-        }, 200, [
-            'Content-Type' => 'application/x-ndjson',
-            'Cache-Control' => 'no-cache, no-store',
-            'X-Accel-Buffering' => 'no',
-        ]);
+        return $this->runs->enqueue($parameters, $context);
     }
 
     public function verifyCsrf(string $token): void
@@ -131,10 +106,18 @@ final readonly class CommandCenterService
         $this->executeValidated($parameters, $emit, $context, true);
     }
 
+    /** Execute a run that was queued earlier: the history record already exists as "queued". */
+    public function executeQueued(string $historyId, CommandRunParameters $parameters, array $context = []): void
+    {
+        $this->executeValidated($parameters, static function (array $event): void {}, $context, false, $historyId);
+    }
+
     private function executeValidated(
         CommandRunParameters $parameters, callable $emit, array $context = [], bool $validate = false,
+        ?string $historyId = null,
     ): void {
-        $historyId = $this->history?->start($parameters, $context);
+        $queued = $historyId !== null;
+        $historyId ??= $this->history?->start($parameters, $context);
         $output = '';
         $truncated = false;
         $exitCode = null;
@@ -169,6 +152,9 @@ final readonly class CommandCenterService
         $scriptPath = null;
         try {
             if ($historyId !== null) {
+                if ($queued) {
+                    $this->history?->begin($historyId);
+                }
                 $emit(['type' => 'run', 'id' => $historyId]);
             }
             if ($validate) {

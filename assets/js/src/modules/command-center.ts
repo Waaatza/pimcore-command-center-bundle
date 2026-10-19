@@ -3,6 +3,7 @@ import { serviceIds } from '@pimcore/studio-ui-bundle/app'
 import { type MainNavRegistry, type ComponentRegistryInterface } from '@pimcore/studio-ui-bundle/modules/app'
 import { type WidgetRegistry } from '@pimcore/studio-ui-bundle/modules/widget-manager'
 import { CommandCenter } from '../components/command-center/command-center'
+import { CommandCenterNavTitle } from '../components/command-center/nav-title'
 import { GlobalActionButtons, ObjectActionButtons, AssetActionButtons, DocumentActionButtons } from '../components/command-center/studio-action-buttons'
 
 export const CommandCenterModule: AbstractModule = {
@@ -13,7 +14,7 @@ export const CommandCenterModule: AbstractModule = {
     registry.registerToSlot('asset.editor.toolbar.slots.right', { name: 'command-center-asset-actions', component: AssetActionButtons, priority: 50 })
     registry.registerToSlot('document.editor.toolbar.slots.right', { name: 'command-center-document-actions', component: DocumentActionButtons, priority: 50 })
     container.get<WidgetRegistry>(serviceIds.widgetManager).registerWidget({
-      name: 'command-center', component: CommandCenter
+      name: 'command-center', component: CommandCenter, titleComponent: CommandCenterNavTitle
     })
     container.get<MainNavRegistry>(serviceIds.mainNavRegistry).registerMainNavItem({
       path: 'System/Command Center',

@@ -70,9 +70,10 @@ Existing workflows without fields retain their literal arguments and need no mig
 
 ## Results and access
 
-A template runs through the existing streaming execution path; a workflow runs through the existing
-background worker. Closing a template's active dialog aborts its HTTP stream; a queued workflow continues
-in the worker after its dialog closes. Its full run remains available to administrators in run history.
+Both a template run and a workflow run are **queued** and executed by the background worker; the request
+answers immediately with the run ID and status *Queued* and the dialog polls the run. Closing the dialog does
+not stop the execution — the run continues in the worker and its full run remains available to administrators
+in run history, where it can be reopened. This requires the worker to be running.
 
 Editors see only their own action run's status, step labels/statuses and exit code. Full command/PHP source,
 input snapshots, raw exception details and other users' history are never returned by the action-result API.

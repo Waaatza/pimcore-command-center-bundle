@@ -102,3 +102,46 @@ assert.equal(modal(render()), undefined)
 render(false)
 assert.equal(intervals.size, 0, 'History polling survived tab deactivation')
 console.log('History detail modal, loading, reopen, abort, stale responses, parent navigation and errors checked.')
+
+// Der Navigations-Badge zaehlt nur laufende/queued Runs und stoppt mit dem Unmount.
+const badgeIntervals = new Set()
+let badgeItems = []
+const badgeExports = {}
+const badgeSource = readFileSync(new URL('../js/src/components/command-center/nav-title.tsx', import.meta.url), 'utf8')
+runInNewContext(ts.transpileModule(badgeSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, esModuleInterop: true }
+}).outputText, {
+  exports: badgeExports,
+  require: name => {
+    if (name === 'react') return React
+    if (name === '@pimcore/studio-ui-bundle/components') return components
+    if (name === '@pimcore/studio-ui-bundle/app') return { useTranslation: () => ({ t: key => key }) }
+    if (name === './api') return { commandCenterUrl: path => path }
+    throw new Error(`Unexpected import: ${name}`)
+  },
+  AbortController,
+  window: { setInterval: callback => { badgeIntervals.add(callback); return callback }, clearInterval: callback => badgeIntervals.delete(callback) },
+  fetch: async path => ({ ok: true, json: async () => ({ items: badgeItems, total: badgeItems.length }) })
+})
+const renderBadge = () => {
+  cursor = 0
+  const internal = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher
+  const previous = internal.current
+  internal.current = dispatcher
+  let tree
+  try { tree = badgeExports.CommandCenterNavTitle() } finally { internal.current = previous }
+  const queued = effects; effects = []
+  for (const effect of queued) effect()
+  return tree
+}
+hooks.length = 0
+badgeItems = [{ status: 'running', active: true }, { status: 'running', active: true }, { status: 'running', active: false }]
+renderBadge(); await settle()
+let badgeTree = renderBadge()
+assert.equal(nodes(badgeTree).some(node => node.type === 'Tag' && node.props.color === 'processing' && node.props.children === 2), true, 'Nav badge did not count active runs')
+hooks.length = 0
+badgeItems = []
+renderBadge(); await settle()
+badgeTree = renderBadge()
+assert.equal(nodes(badgeTree).some(node => node.type === 'Tag'), false, 'Nav badge stayed visible without active runs')
+console.log('Navigation badge counts active runs and hides when idle.')

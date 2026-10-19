@@ -52,12 +52,14 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
   const [output, setOutput] = useState('')
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
+  const [runningId, setRunningId] = useState<string>()
   const controller = useRef<AbortController>()
+  const mounted = useRef(true)
   const item = items.find(value => value.id === selected)
   const previewRequest = JSON.stringify({ id: item?.id, revision: item?.revision, values })
   const preview = previewSnapshot?.request === previewRequest ? previewSnapshot.result : undefined
   const watchedFields = Form.useWatch('fields', editorForm) as Field[] | undefined
-  useEffect(() => () => { controller.current?.abort() }, [])
+  useEffect(() => () => { mounted.current = false; controller.current?.abort() }, [])
   useEffect(() => {
     if (!active) return
     const abort = new AbortController()
@@ -106,37 +108,42 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
     })
   }
   const run = async (value: Template): Promise<void> => {
-    const abort = new AbortController(); controller.current = abort
     setOutput('')
     setPreview(undefined)
-    try {
-      const response = await post('run', actionData(value), abort.signal)
-      if (response.body === null) throw new Error(t('command-center.error.stream'))
-      const reader = response.body.getReader(); const decoder = new TextDecoder()
-      let pending = ''; let completed = false
-      while (true) {
-        const { done, value } = await reader.read()
-        pending += decoder.decode(value, { stream: !done })
-        const lines = pending.split('\n'); pending = lines.pop() ?? ''
-        for (const line of lines) {
-          if (line === '') continue
-          const event = JSON.parse(line) as { type: string, text?: string, code?: number }
-          if (event.type === 'error') throw new Error(event.text)
-          if (event.type === 'exit') {
-            completed = true
-            setOutput(previous => previous + '\n' + t('command-center.status.exit', { code: event.code }))
-          } else if (event.text !== undefined) setOutput(previous => (previous + event.text).slice(-1000000))
-        }
-        if (done) break
-      }
-      if (!completed) throw new Error(t('command-center.error.disconnected'))
-      if (value.previewSupported === true) {
-        const updated = await post('preview', actionData(value), abort.signal)
-        const result = await updated.json() as Preview
-        if (!abort.signal.aborted) setPreview({ result, request: previewRequest })
-      }
-    } finally { controller.current = undefined }
+    const response = await post('run', actionData(value))
+    const queued = await response.json() as { id: string }
+    if (mounted.current) setRunningId(queued.id)
   }
+  useEffect(() => {
+    if (runningId === undefined) return
+    const abort = new AbortController(); controller.current = abort
+    let timer: ReturnType<typeof setTimeout>
+    const value = items.find(candidate => candidate.id === selected)
+    const poll = async (): Promise<void> => {
+      try {
+        const detail = await fetch(commandCenterUrl(`history/${runningId}`), { signal: abort.signal, cache: 'no-store' })
+        if (!detail.ok) throw new Error(`${detail.status}: ${await detail.text()}`)
+        const record = await detail.json() as { status: string, output?: string, error?: string | null }
+        if (abort.signal.aborted) return
+        setOutput(record.output ?? '')
+        if (record.status === 'queued' || record.status === 'running') {
+          timer = setTimeout(() => { void poll() }, 2000)
+          return
+        }
+        if (mounted.current) setRunningId(undefined)
+        if (record.status !== 'success' && mounted.current) setError(record.error ?? t(`command-center.history.status.${record.status}`))
+        if (value?.previewSupported === true) {
+          const updated = await post('preview', actionData(value), abort.signal)
+          const result = await updated.json() as Preview
+          if (!abort.signal.aborted && mounted.current) setPreview({ result, request: previewRequest })
+        }
+      } catch (reason) {
+        if (!abort.signal.aborted && mounted.current) { setRunningId(undefined); setError(String(reason)) }
+      }
+    }
+    void poll()
+    return () => { abort.abort(); clearTimeout(timer); controller.current = undefined }
+  }, [runningId])
   const save = (): void => {
     if (editor === undefined) return
     void perform(async () => {

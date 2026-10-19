@@ -16,15 +16,22 @@ the details of a step offers **Open workflow run** to move back to the combined 
 
 Filter by command/label, status (including *Queued*) or trigger (including *Workflow*). The list is paginated (25 runs per page); details show the
 saved input and output. **Details** opens a dialog with a loading state, error messages, the saved snapshot and output.
-An active history tab refreshes every five seconds. The server updates output
-approximately once a second when output arrives and writes the final result when execution ends.
+An active history tab refreshes every five seconds; the navigation badge shows how many runs are queued or running.
+The server updates output approximately once a second when output arrives and writes the final result when execution ends.
 Only the last 1 MB of output is retained per run; truncated output is explicitly marked.
+
+Every new run — direct, inline, template and Studio action included — is **queued** and executed by the
+[background worker](scheduling.md#background-worker). Starting one answers immediately with the run ID and
+status *Queued*; the record then moves through *Running* to its final state. Closing the dialog of a running
+execution therefore does not stop it: reopen it later from this list. Scheduled and workflow runs behave the
+same way.
 
 History starts when this version is installed. Existing latest schedule results are preserved in their
 schedule, but cannot be reconstructed into a complete history. Runs from an external terminal are not recorded.
 After an abrupt process/worker termination, an unfinished record becomes **Interrupted** when read after
 ten minutes. Its actual finish time and exit code remain unknown. Commands still have a five-minute timeout.
-Disconnecting a direct/template run stops it when the server detects the disconnect; the history remains.
+Because a queued run executes in the worker, closing or disconnecting its dialog does not stop it; a record
+still in the *Queued* state that has no worker to pick it up simply stays queued.
 
 ![Run history](img/run-history.png)
 
@@ -86,7 +93,7 @@ templates, first preview the inputs, inspect the count and sample changes, then 
 inputs clears the preview. The preview is bound to the selected template ID, revision and input values.
 Reloading a changed template requires a fresh preview; delayed responses for an older revision cannot
 enable execution or appear as current results. While a command runs, its previous preview is hidden.
-After the execution stream finishes, a fresh preview is loaded automatically, including after a nonzero exit code so partial changes
+After the queued execution finishes, a fresh preview is loaded automatically, including after a nonzero exit code so partial changes
 are reflected. If execution or preview loading fails, the old preview remains hidden. Commands without a provider show that preview is unavailable
 and can still be run normally. A preview is advisory: objects may change before execution and commands must
 re-evaluate their selection. It is not a transaction or a guarantee that every planned write will succeed.

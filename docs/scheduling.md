@@ -33,7 +33,8 @@ retried automatically because it may already have modified data.
 
 ## Background worker
 
-Schedules and queued workflow runs execute in a worker. Keep it running in the host application's environment:
+Schedules and every queued execution — direct, inline PHP, template, Studio action and workflow runs — execute
+in this worker. Keep it running in the host application's environment:
 
 ```sh
 php bin/console messenger:consume scheduler_command_center --memory-limit=250M --time-limit=3600
@@ -58,5 +59,6 @@ The worker must reach your application's database and other services and use the
 user/permissions as the web application for `var/command-center`. The Symfony scheduler checks every ten
 seconds and runs jobs serially: overdue recurrences are coalesced into one execution, a long job delays later
 ones, and the Command Center tab shows the latest worker heartbeat (its absence means no worker has checked
-the plans yet). Workflows and schedules share one runner lock, so a long workflow delays later plans and a long
-plan delays queued workflows.
+the plans yet). Direct, template, Studio action, workflow and scheduled runs share one worker, queue and
+runner lock, so a long job delays later runs and a queued run starts within one ten-second interval. Without a
+running worker, queued executions stay *Queued*.

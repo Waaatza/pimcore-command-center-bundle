@@ -37,8 +37,10 @@ shows the combined output, the status of each step and, per step, its own output
 The run starts when the worker next processes the scheduler: the same
 `messenger:consume scheduler_command_center` worker that executes schedules checks the queue every ten
 seconds, after due schedules have been claimed. The run therefore continues when Studio is closed, and
-it starts within one interval when no schedule is due. Workflows and schedules share one runner lock
-and execute serially: a long workflow delays later plans, and a long plan delays queued workflows.
+it starts within one interval when no schedule is due. Direct, template and Studio action runs share this
+worker and queue, so workflow runs, those runs and schedules all execute serially under one runner lock:
+a long job delays later plans and queued runs, and a long plan delays queued workflows. This is also why a
+direct or template execution starts within one worker interval rather than instantly.
 
 Steps run strictly in order. The first failing step stops the workflow: its exit code becomes the exit
 code of the run, its error message becomes the run error, and all later steps change from *Pending* to

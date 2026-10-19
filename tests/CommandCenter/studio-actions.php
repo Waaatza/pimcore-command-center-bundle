@@ -33,6 +33,8 @@ use Watza\CommandCenterBundle\Parameter\WorkflowSaveParameters;
 use Watza\CommandCenterBundle\Service\CommandCenterService;
 use Watza\CommandCenterBundle\Service\CommandHistoryStore;
 use Watza\CommandCenterBundle\Service\CommandInputResolver;
+use Watza\CommandCenterBundle\Service\CommandRunQueue;
+use Watza\CommandCenterBundle\Service\CommandRunWorker;
 use Watza\CommandCenterBundle\Service\CommandTemplateService;
 use Watza\CommandCenterBundle\Service\CommandWorkflowRunner;
 use Watza\CommandCenterBundle\Service\CommandWorkflowService;
@@ -125,7 +127,8 @@ $elements = new class (['object' => $object, 'asset' => $asset, 'document' => $d
 $csrf = new CsrfTokenManager(); $token = $csrf->getToken('command-center')->getValue();
 $storage = new PrivateJsonStorage($directory . '/data');
 $history = new CommandHistoryStore($storage);
-$commands = new CommandCenterService($csrf, $directory, 'test', $history, $security);
+$queue = new CommandRunQueue($storage, $history);
+$commands = new CommandCenterService($csrf, $directory, 'test', $history, $security, $queue);
 $inputs = new CommandInputResolver();
 $reconciler = new StudioActionReconciler($storage);
 $templates = new CommandTemplateService($storage, $commands, $reconciler);
@@ -134,6 +137,7 @@ $access = new StudioActionAccess($storage, $security, $elements, $users);
 $service = new StudioActionService($storage, $access, $commands, $templates, $workflows, $history, $inputs,
     $csrf, $users, $roles);
 $runner = new CommandWorkflowRunner($storage, $commands, $history, $access);
+$runWorker = new CommandRunWorker($storage, $commands, $history, $access);
 $check = static function (bool $ok, string $message): void { if (!$ok) throw new RuntimeException($message); };
 $reject = static function (callable $call, string $type): void {
     try { $call(); } catch (Throwable $error) { if ($error instanceof $type) return; throw $error; }
@@ -144,12 +148,6 @@ $remove = static function (string $path) use (&$remove): void {
         foreach (array_diff(scandir($path), ['.', '..']) as $child) $remove($path . '/' . $child);
         rmdir($path);
     } else unlink($path);
-};
-$stream = static function ($response): string {
-    $output = '';
-    ob_start(static function (string $chunk) use (&$output): string { $output .= $chunk; return ''; });
-    try { $response->sendContent(); } finally { ob_end_flush(); }
-    return $output;
 };
 try {
     $field = ['name' => 'target', 'label' => 'Target', 'type' => 'string', 'required' => true];
@@ -199,10 +197,9 @@ try {
     $reject(fn () => $service->run($request($action, ['values' => []])), BadRequestHttpException::class);
     $reject(fn () => $service->run($request($action, ['values' => ['target' => '--env=prod']])),
         BadRequestHttpException::class);
-    $body = $stream($service->run($request($action, ['values' => ['target' => '/safe; $(literal)']])));
-    $check(!str_contains($body, 'secret-output'), 'Restricted output leaked through stream.');
-    $events = array_map(static fn ($line) => json_decode($line, true), array_filter(explode("\n", $body)));
-    $id = array_values(array_filter($events, static fn ($event) => $event['type'] === 'run'))[0]['id'];
+    $queued = $service->run($request($action, ['values' => ['target' => '/safe; $(literal)']]));
+    $runWorker->tickQueued();
+    $id = $queued['id'];
     $safe = $service->result(new StudioActionRequest(runId: $id));
     $check($safe['status'] === 'success' && !isset($safe['output'], $safe['error'], $safe['tokens']), 'Result leaked.');
     $executed = json_decode(trim(file_get_contents($directory . '/executed')), true);
@@ -246,9 +243,8 @@ try {
         $redacted = $save(['placements' => [$type], 'objectClasses' => $type === 'object' ? ['Product'] : [],
             'elementPermission' => 'read', 'bindings' => ['target' => ['source' => 'id']], 'showOutput' => false]);
         $security->current = $editor;
-        $events = array_map(static fn ($line) => json_decode($line, true), array_filter(explode("\n",
-            $stream($service->run($request($redacted, $args))))));
-        $redactedRun = array_values(array_filter($events, static fn ($event) => $event['type'] === 'run'))[0]['id'];
+        $redactedRun = $service->run($request($redacted, $args))['id'];
+        $runWorker->tickQueued();
         $check($service->result(new StudioActionRequest(runId: $redactedRun))['status'] === 'success',
             'Editor lost the result of a visible element.');
         $security->view = false;

@@ -28,6 +28,7 @@ const registration = compile('modules/command-center.ts', {
     : { registerWidget: () => {}, registerMainNavItem: () => {} } } },
   '@pimcore/studio-ui-bundle/app': { serviceIds: { 'App/ComponentRegistry/ComponentRegistry': 'registry' } },
   '../components/command-center/command-center': { CommandCenter: () => null },
+  '../components/command-center/nav-title': { CommandCenterNavTitle: () => null },
   '../components/command-center/studio-action-buttons': {
     GlobalActionButtons: () => null, ObjectActionButtons: () => null,
     AssetActionButtons: () => null, DocumentActionButtons: () => null
@@ -99,13 +100,9 @@ const api = compile('components/command-center/studio-actions-api.ts', {
     if (path === 'run') {
       if (typeof runResult === 'number') return { ok: false, status: runResult }
       if (runResult === 'network') throw new Error('network')
-      let delivered = false
-      return { ok: true, status: 200, headers: { get: () => 'application/x-ndjson' }, body: { getReader: () => ({ read: async () => {
-        if (delivered) return { done: true }
-        delivered = true
-        return { done: false, value: new TextEncoder().encode('{"type":"run","id":"own-run"}\n{"type":"exit","code":0}\n') }
-      } }) } }
+      return { ok: true, status: 202, json: async () => ({ id: 'own-run', status: 'queued' }) }
     }
+    if (path === 'result') return { ok: true, json: async () => ({ id: 'own-run', status: 'success', exitCode: 0, steps: [] }) }
     throw new Error(`Unexpected action request: ${path}`)
 } })
 const dialog = compile('components/command-center/studio-action-dialog.tsx', {
@@ -152,6 +149,7 @@ assert.equal(button(tree, 'command-center.ui.execute').props.disabled, true, 'Ol
 delayedPreview = undefined
 button(tree, 'command-center.templates.preview').props.onClick(); await settle()
 button(render(), 'command-center.ui.execute').props.onClick(); await settle()
+render(); await settle()
 tree = render()
 const run = calls.find(call => call.path === 'run')
 assert.equal(run.body.values.target, 'second')
@@ -181,6 +179,7 @@ for (const scenario of [400, 401, 403, 404, 409, 422, 500, 'network']) {
     runResult = undefined
     button(render(), 'command-center.templates.preview').props.onClick(); await settle()
     button(render(), 'command-center.ui.execute').props.onClick(); await settle()
+    render(); await settle()
     assert.equal(calls.filter(call => call.path === 'run').length, 2, 'Corrected inputs could not be submitted again')
     assert.equal(nodes(render()).some(node => node.props.role === 'status' && node.props.children === 'command-center.history.status.success'), true)
 

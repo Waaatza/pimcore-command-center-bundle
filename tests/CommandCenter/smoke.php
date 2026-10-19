@@ -6,6 +6,10 @@ require dirname(__DIR__) . '/bootstrap.php';
 
 use Watza\CommandCenterBundle\Parameter\CommandRunParameters;
 use Watza\CommandCenterBundle\Service\CommandCenterService;
+use Watza\CommandCenterBundle\Service\CommandHistoryStore;
+use Watza\CommandCenterBundle\Service\CommandRunQueue;
+use Watza\CommandCenterBundle\Service\CommandRunWorker;
+use Watza\CommandCenterBundle\Service\PrivateJsonStorage;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Security\Csrf\CsrfTokenManager;
@@ -31,7 +35,17 @@ exit(7);
 CONSOLE);
 $tokens = new CsrfTokenManager();
 $token = $tokens->getToken('command-center')->getValue();
-$service = new CommandCenterService($tokens, $directory, 'test');
+$storage = new PrivateJsonStorage($directory . '/data');
+$history = new CommandHistoryStore($storage);
+$queue = new CommandRunQueue($storage, $history);
+$service = new CommandCenterService($tokens, $directory, 'test', $history, null, $queue);
+$worker = new CommandRunWorker($storage, $service, $history);
+$run = static function (CommandRunParameters $parameters) use ($service, $worker, $history): array {
+    $queued = $service->queue($parameters);
+    $worker->tickQueued();
+
+    return $history->get($queued['id']);
+};
 $check = static function (bool $condition, string $message): void {
     if (!$condition) {
         throw new RuntimeException($message);
@@ -40,44 +54,26 @@ $check = static function (bool $condition, string $message): void {
 try {
     $check($service->catalog()['commands'][0]['name'] === 'test:output', 'Catalog missing command');
     try {
-        $service->run(new CommandRunParameters('test:output', 'invalid'));
+        $service->queue(new CommandRunParameters('test:output', 'invalid'));
         throw new RuntimeException('Invalid CSRF token accepted');
     } catch (AccessDeniedHttpException) {
     }
     foreach ([['unknown', []], ['test:output', ['--env=prod']]] as [$name, $arguments]) {
         try {
-            $service->run(new CommandRunParameters($name, $token, $arguments));
+            $service->queue(new CommandRunParameters($name, $token, $arguments));
             throw new RuntimeException('Invalid command or environment override accepted');
         } catch (BadRequestHttpException) {
         }
     }
     $literal = 'hello; $(echo shell-executed)';
-    $response = $service->run(new CommandRunParameters('test:output', $token, [$literal]));
-    $events = '';
-    ob_start(static function (string $chunk) use (&$events): string {
-        $events .= $chunk;
-        return '';
-    });
-    $response->sendContent();
-    ob_end_flush();
-    $decoded = array_map(static fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR),
-        explode("\n", trim($events)));
-    $text = implode('', array_column($decoded, 'text'));
+    $record = $run(new CommandRunParameters('test:output', $token, [$literal]));
+    $text = $record['output'];
+    $check($record['status'] === 'failed' && $record['exitCode'] === 7, 'Exit code missing');
     $check(str_contains($text, $literal), 'Arguments were changed or interpreted by a shell');
     $check(str_contains($text, 'stderr-message'), 'stderr output missing');
-    $check(end($decoded) === ['type' => 'exit', 'code' => 7], 'Exit code missing');
     foreach (["echo 'inline-ok';", "<?php echo 'inline-ok';", "<?php throw new RuntimeException('script-error');"] as $code) {
-        $response = $service->run(new CommandRunParameters('pimcore:run-script', $token, phpCode: $code));
-        $events = '';
-        ob_start(static function (string $chunk) use (&$events): string {
-            $events .= $chunk;
-            return '';
-        });
-        $response->sendContent();
-        ob_end_flush();
-        $decoded = array_map(static fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR),
-            explode("\n", trim($events)));
-        $text = implode('', array_column($decoded, 'text'));
+        $record = $run(new CommandRunParameters('pimcore:run-script', $token, phpCode: $code));
+        $text = $record['output'];
         $check(str_contains($text, str_contains($code, 'script-error') ? 'script-error' : 'inline-ok'),
             'Inline script output missing');
         preg_match('/SCRIPT_PATH=([^\r\n]+)/', $text, $matches);
@@ -87,14 +83,20 @@ try {
     foreach ([['test:output', [], 'echo 1;'], ['pimcore:run-script', [], ' '],
         ['pimcore:run-script', ['other.php'], 'echo 1;']] as [$name, $arguments, $code]) {
         try {
-            $service->run(new CommandRunParameters($name, $token, $arguments, $code));
+            $service->queue(new CommandRunParameters($name, $token, $arguments, $code));
             throw new RuntimeException('Invalid inline script request accepted');
         } catch (BadRequestHttpException) {
         }
     }
     echo "Command Center smoke checks passed.\n";
 } finally {
-    unlink($directory . '/bin/console');
-    rmdir($directory . '/bin');
-    rmdir($directory);
+    $remove = static function (string $path) use (&$remove): void {
+        if (is_dir($path)) {
+            foreach (array_diff(scandir($path), ['.', '..']) as $child) $remove($path . '/' . $child);
+            rmdir($path);
+        } elseif (is_file($path)) {
+            unlink($path);
+        }
+    };
+    $remove($directory);
 }

@@ -13,6 +13,8 @@ use Watza\CommandCenterBundle\Preview\CommandPreviewProviderInterface;
 use Watza\CommandCenterBundle\Preview\CommandPreviewResult;
 use Watza\CommandCenterBundle\Service\CommandCenterService;
 use Watza\CommandCenterBundle\Service\CommandHistoryStore;
+use Watza\CommandCenterBundle\Service\CommandRunQueue;
+use Watza\CommandCenterBundle\Service\CommandRunWorker;
 use Watza\CommandCenterBundle\Service\CommandTemplateService;
 use Watza\CommandCenterBundle\Service\PrivateJsonStorage;
 use Watza\CommandCenterBundle\Service\StudioActionReconciler;
@@ -43,7 +45,9 @@ $security = new class implements \Pimcore\Bundle\StudioBackendBundle\Security\Se
     public function hasElementPermissions(\Pimcore\Model\Element\ElementInterface $element, \Pimcore\Model\UserInterface $user, array $permissions): void {}
     public function getSpecialDataObjectPermissions(\Pimcore\Model\DataObject $dataObject, \Pimcore\Model\UserInterface $user, string $permission): array { return []; }
 };
-$commands = new CommandCenterService($csrf, $directory, 'test', $history, $security);
+$queue = new CommandRunQueue($storage, $history);
+$commands = new CommandCenterService($csrf, $directory, 'test', $history, $security, $queue);
+$worker = new CommandRunWorker($storage, $commands, $history);
 $provider = new class implements CommandPreviewProviderInterface {
     public array $lastTokens = [];
     public function command(): string { return 'test:preview'; }
@@ -105,14 +109,13 @@ try {
     foreach ([['{{unknown}}'], ['{{folder}'], [123], ['--env=prod']] as $invalid) {
         $reject(fn () => $service->save(new TemplateSaveParameters($token, 'Invalid', 'test:preview', tokens: $invalid, fields: $fields)), BadRequestHttpException::class);
     }
-    $response = $service->run($action);
-    $events = '';
-    ob_start(static function (string $chunk) use (&$events): string { $events .= $chunk; return ''; });
-    $response->sendContent(); ob_end_flush();
-    $check(str_contains($events, 'template-executed'), 'Template output missing');
+    $queued = $service->run($action);
+    $check($queued['status'] === 'queued' && !file_exists($directory . '/executed'), 'Template run was not queued');
+    $worker->tickQueued();
     $executed = json_decode(file_get_contents($directory . '/executed'), true);
     $check($executed === ['test:preview', '/test; $(no-shell)', '--limit=10', '--mode=a'], 'Execution used different arguments');
     $run = $history->list(source: 'template')['items'][0];
+    $check(str_contains($history->get($run['id'])['output'], 'template-executed'), 'Template output missing');
     $check($run['actorId'] === 101 && $run['actorName'] === 'test-admin', 'Initiating user missing from history');
     $check($run['templateId'] === $item['id'] && $run['status'] === 'success', 'Template history missing');
     $updated = $service->save(new TemplateSaveParameters($token, 'Renamed', 'test:preview', tokens: $args,
@@ -132,16 +135,15 @@ try {
     $scriptAction = new TemplateActionParameters($token, $script['id'], 1, ['folder' => '/safe']);
     [, $resolved] = $service->resolve($scriptAction);
     $check($resolved->phpCode === $code, 'Resolved template lost or interpolated PHP source');
-    $events = '';
-    ob_start(static function (string $chunk) use (&$events): string { $events .= $chunk; return ''; });
-    $service->run($scriptAction)->sendContent(); ob_end_flush();
-    $scriptEvents = array_map(static fn ($line) => json_decode($line, true), array_filter(explode("\n", $events)));
-    $check(str_contains(implode('', array_column($scriptEvents, 'text')), '{{folder}}:/safe'),
-        'Template PHP or JSON inputs did not execute');
+    $service->run($scriptAction);
+    $worker->tickQueued();
     $scriptHistory = $history->list(search: 'pimcore:run-script')['items'][0];
+    $check(str_contains($history->get($scriptHistory['id'])['output'], '{{folder}}:/safe'),
+        'Template PHP or JSON inputs did not execute');
     $check($history->get($scriptHistory['id'])['phpCode'] === $code, 'History lost PHP snapshot');
-    $scriptArgs = json_decode(file_get_contents($directory . '/executed'), true);
-    $check(!file_exists($scriptArgs[1]), 'Temporary PHP script was not removed');
+    $entries = array_values(array_filter(explode("\n", trim(file_get_contents($directory . '/executed')))));
+    $scriptArgs = json_decode(end($entries), true);
+    $check(!$scriptArgs[0] || !file_exists($scriptArgs[0]), 'Temporary PHP script was not removed');
     $reject(fn () => $service->save(new TemplateSaveParameters($token, 'Invalid PHP', 'test:unsupported',
         phpCode: $code)), BadRequestHttpException::class);
     $reject(fn () => $service->save(new TemplateSaveParameters($token, 'Empty PHP', 'pimcore:run-script',

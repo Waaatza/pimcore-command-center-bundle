@@ -13,6 +13,7 @@ final readonly class CommandScheduleRunner
         private CommandCenterService $commands,
         private FailureNotifierInterface $notifier,
         private ?CommandWorkflowRunner $workflows = null,
+        private ?CommandRunWorker $runs = null,
     )
     {
     }
@@ -39,6 +40,7 @@ final readonly class CommandScheduleRunner
             }
             if ($item === null) {
                 $this->workflows?->tickQueued();
+                $this->runs?->tickQueued();
                 return;
             }
             $output = '';

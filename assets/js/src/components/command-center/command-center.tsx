@@ -100,8 +100,8 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
     controller.current = abort
     setRunning(true)
     setOutput('')
+    setExitCode(undefined)
     setStatus('running-progress')
-    let completed = false
     try {
       const response = await fetch(commandCenterUrl('run'), {
         method: 'POST', signal: abort.signal,
@@ -109,34 +109,30 @@ const CommandRunner = ({ onDraftChange }: { onDraftChange: (draft: CommandDraft)
         body: JSON.stringify({ command: selected, tokens: args, csrfToken, phpCode: inlineScript ? phpCode : null })
       })
       if (!response.ok) throw new Error(t('command-center.error.run', { status: response.status, detail: await response.text() }))
-      if (response.body === null) throw new Error(t('command-center.error.stream'))
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let pending = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        pending += decoder.decode(value, { stream: !done })
-        const lines = pending.split('\n')
-        pending = lines.pop() ?? ''
-        for (const line of lines) {
-          if (line === '') continue
-          const event = JSON.parse(line) as { type: string, text?: string, code?: number }
-          if (event.type === 'exit') {
-            completed = true
-            setExitCode(event.code)
-            setStatus('exit')
-          } else if (event.type === 'error') {
-            throw new Error(event.text)
-          } else {
-            setOutput(previous => (previous + (event.text ?? '')).slice(-1000000))
-          }
+      const queued = await response.json() as { id: string }
+      for (;;) {
+        const detail = await fetch(commandCenterUrl(`history/${queued.id}`), { signal: abort.signal, cache: 'no-store' })
+        if (!detail.ok) throw new Error(t('command-center.error.run', { status: detail.status, detail: await detail.text() }))
+        const record = await detail.json() as {
+          status: string, output?: string, exitCode?: number | null, error?: string | null
         }
-        if (done) break
+        if (abort.signal.aborted) return
+        setOutput(record.output ?? '')
+        if (record.status === 'queued' || record.status === 'running') {
+          setStatus('running-progress')
+        } else {
+          setExitCode(record.exitCode ?? undefined)
+          setStatus(record.status === 'success' ? 'exit' : (record.exitCode != null ? 'exit' : 'interrupted'))
+          if (record.error != null && record.error !== '') setError(record.error)
+          break
+        }
+        await new Promise(resolve => { window.setTimeout(resolve, 2000) })
       }
-      if (!completed) throw new Error(t('command-center.error.disconnected'))
     } catch (reason) {
-      setStatus('interrupted')
-      setError(reason instanceof Error ? reason.message : String(reason))
+      if (!abort.signal.aborted) {
+        setStatus('interrupted')
+        setError(reason instanceof Error ? reason.message : String(reason))
+      }
     } finally {
       setRunning(false)
       controller.current = undefined

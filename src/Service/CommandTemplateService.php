@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Watza\CommandCenterBundle\Service;
 
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -85,11 +84,11 @@ final readonly class CommandTemplateService
             'message' => $result->message];
     }
 
-    public function run(TemplateActionParameters $parameters): StreamedResponse
+    public function run(TemplateActionParameters $parameters): array
     {
         [$item, $run] = $this->resolve($parameters);
 
-        return $this->commands->run($run, [
+        return $this->commands->queue($run, [
             'source' => 'template', 'templateId' => $item['id'], 'templateLabel' => $item['label'],
             'inputValues' => $this->inputs->values($item['fields'], $parameters->values),
         ]);

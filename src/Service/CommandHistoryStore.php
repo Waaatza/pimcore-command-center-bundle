@@ -122,6 +122,7 @@ final readonly class CommandHistoryStore
     private function summary(array $record): array
     {
         unset($record['tokens'], $record['phpCode'], $record['output'], $record['workflowSteps'], $record['inputValues']);
+        $record['active'] = in_array($record['status'], ['queued', 'running'], true);
 
         return $record;
     }

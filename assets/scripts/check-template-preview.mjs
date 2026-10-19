@@ -76,18 +76,11 @@ runInNewContext(compiled, {
     }
     if (path === 'templates/run') {
       ranTemplate = JSON.parse(options.body)
-      const events = ['{"type":"text","text":"ran"}', '{"type":"exit","code":0}']
-      return {
-        ok: true,
-        body: new ReadableStream({
-          start(controller) {
-            const encoder = new TextEncoder()
-            events.forEach(event => controller.enqueue(encoder.encode(`${event}\n`)))
-            controller.close()
-          }
-        })
-      }
+      return { ok: true, json: async () => ({ id: 'run-id', status: 'queued' }) }
     }
+    if (path.startsWith('history/')) return { ok: true, json: async () => ({
+      id: path.split('/')[1], status: 'success', output: 'ran', exitCode: 0, error: null
+    }) }
     if (path === 'templates/preview') return { ok: true, json: async () => pendingPreview ?? { supported: true, count: 1, samples: [] } }
     return ({
     ok: true,
@@ -195,7 +188,8 @@ assert.equal(rowButton(directTree, 'actions', 'command-center.ui.execute').props
 rowButton(directTree, 'actions', 'command-center.ui.execute').props.onClick()
 await settle()
 assert.equal(ranTemplate.id, 'template', 'Row run sent the wrong template')
-assert.equal(nodes(render()).some(node => node.type === 'Output' && String(node.props.text).includes('command-center.status.exit')), true, 'Row run did not stream its output')
+render(); await settle()
+assert.equal(nodes(render()).some(node => node.type === 'Output' && String(node.props.text).includes('ran')), true, 'Row run did not show its output')
 
 // Vorlagen mit Eingabefeldern bleiben listen-deaktiviert und verweisen auf die Details.
 fieldCount = 1

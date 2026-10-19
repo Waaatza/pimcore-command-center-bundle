@@ -5,11 +5,11 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 ![Pimcore Studio Command Control Center with inline PHP execution](docs/img/studio-command-control-center.png)
 
 - Search all registered console commands and inspect their arguments/options.
-- Stream stdout/stderr and display the exit code.
+- Run commands in the background and see their output and exit code.
 - Paste PHP directly for `pimcore:run-script`.
 - Schedule one-time, hourly, daily or weekly executions.
 - Edit, enable/disable/delete plans and inspect the latest output and status.
-- Persistent run history with input/output snapshots, filters and pagination.
+- Persistent run history with input/output snapshots, filters and pagination; running executions can be closed and reopened from history, and a navigation badge shows how many are active.
 - Reusable command templates with input fields, inline PHP and opt-in read-only object previews.
 - Multi-step workflows that run commands in the background and stop at the first failure.
 - Schedule a workflow as a fixed snapshot, with per-step progress in the run history.
@@ -101,6 +101,11 @@ Choose a command. Arguments/options are a JSON array, with one string per CLI to
 Use `[]` for no arguments. Commands are executed without a shell and without interactive prompts, with a
 five-minute process timeout. Environment, ANSI output and interaction flags are controlled by the server.
 
+Starting a direct, template or action run only **queues** it: the request answers immediately with the run ID
+and status *Queued*, and a [background worker](#background-worker) executes it. The dialog polls the run and
+shows output and exit code live, so closing it does not stop the execution — reopen the run later from
+**Run history**. Direct executions therefore need the worker to be running.
+
 For `pimcore:run-script`, paste code in the PHP field, with or without the opening `<?php` tag:
 
 ```php
@@ -159,8 +164,8 @@ worker-interrupted runs notify the recipients; successful runs do not. See
 
 ## Background worker
 
-Schedules and queued workflow runs execute in a background worker. Keep it running in the host application's
-environment:
+Every execution — direct, inline PHP, template, Studio action and workflow runs — is queued and executed by a
+background worker, together with scheduled plans. Keep it running in the host application's environment:
 
 ```sh
 php bin/console messenger:consume scheduler_command_center --memory-limit=250M --time-limit=3600

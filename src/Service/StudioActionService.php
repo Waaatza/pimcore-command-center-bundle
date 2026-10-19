@@ -8,7 +8,6 @@ use Pimcore\Bundle\StaticResolverBundle\Models\User\UserResolverInterface;
 use Pimcore\Model\DataObject\ClassDefinition\Listing as ClassListing;
 use Pimcore\Model\User;
 use Pimcore\Model\User\Role\Listing as RoleListing;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -194,7 +193,7 @@ final readonly class StudioActionService
         ));
     }
 
-    public function run(StudioActionRequest $request): array|StreamedResponse
+    public function run(StudioActionRequest $request): array
     {
         [$action, $target, $element] = $this->resolve($request);
         $user = $this->access->user();
@@ -214,9 +213,9 @@ final readonly class StudioActionService
             $request->csrfToken, $target['id'], $target['revision'], $values,
         ));
 
-        return $this->commands->run($run, $context + [
+        return $this->commands->queue($run, $context + [
             'source' => 'template', 'templateId' => $target['id'], 'templateLabel' => $target['label'],
-        ], !$action['showOutput'] && !$user->isAdmin());
+        ]);
     }
 
     public function result(StudioActionRequest $request): array

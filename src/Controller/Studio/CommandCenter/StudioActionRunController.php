@@ -5,7 +5,6 @@ namespace Watza\CommandCenterBundle\Controller\Studio\CommandCenter;
 
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -28,12 +27,10 @@ final class StudioActionRunController
     #[OA\Post(
         path: '/command-center/actions/run', summary: 'command_center_studioactionrun', tags: ['Command Center'],
     )]
-    #[OA\Response(response: 200, description: 'command_center_studioactionrun_success')]
+    #[OA\Response(response: 202, description: 'command_center_studioactionrun_success')]
     #[OA\Response(response: 403, description: 'Access denied')]
-    public function __invoke(#[MapRequestPayload] StudioActionRequest $parameters): JsonResponse|StreamedResponse
+    public function __invoke(#[MapRequestPayload] StudioActionRequest $parameters): JsonResponse
     {
-        $result = $this->service->run($parameters);
-
-        return $result instanceof StreamedResponse ? $result : new JsonResponse($result);
+        return new JsonResponse($this->service->run($parameters), 202, ['Cache-Control' => 'private, no-store']);
     }
 }
