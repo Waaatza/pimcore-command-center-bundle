@@ -4,6 +4,7 @@ import { Alert, Button, Collapse, Content, Flex, Grid, SearchInput, Select, Tag,
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { WorkflowRunView, statusColor } from './workflow-run'
 import { Output } from './output'
+import { padCells } from './grid-cell'
 import { commandCenterUrl } from './api'
 
 interface Run {
@@ -129,7 +130,7 @@ export const RunHistory = ({ active }: { active: boolean }): React.JSX.Element =
       <Button onClick={() => setRefresh(value => value + 1)}>{t('command-center.history.refresh')}</Button>
     </Flex>
     {error !== '' && <Alert type="error" message={ error } />}
-    <Grid autoWidth columns={ columns } data={ items } size="small" />
+    <Grid autoWidth columns={ padCells(columns) } data={ items } size="small" />
     {items.length === 0 && <Text type="secondary">{t('command-center.history.empty')}</Text>}
     <Flex gap={ 12 } align="center">
       <Button disabled={page <= 1} onClick={() => setPage(value => value - 1)}>{t('command-center.history.previous')}</Button>

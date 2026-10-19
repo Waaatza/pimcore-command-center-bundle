@@ -19,6 +19,7 @@ final readonly class CommandTemplateService
     public function __construct(
         private PrivateJsonStorage $storage,
         private CommandCenterService $commands,
+        private StudioActionReconciler $actions,
         #[TaggedIterator('command_center.preview_provider')]
         private iterable $previewProviders = [],
         private CommandInputResolver $inputs = new CommandInputResolver(),
@@ -68,6 +69,7 @@ final readonly class CommandTemplateService
             $this->find($items ?? [], $parameters->id, $parameters->revision);
             unset($items[$parameters->id]);
         });
+        $this->actions->deactivateTarget('template', $parameters->id);
     }
 
     public function preview(TemplateActionParameters $parameters): array
@@ -94,6 +96,7 @@ final readonly class CommandTemplateService
     }
 
     /** @return array{array, CommandRunParameters} */
+    /** @return array{0: array<string, mixed>, 1: CommandRunParameters} */
     public function resolve(TemplateActionParameters $parameters): array
     {
         $this->commands->verifyCsrf($parameters->csrfToken);

@@ -38,8 +38,9 @@ export interface ActionRequest {
 }
 
 export class ActionHttpError extends Error {
-  constructor (public readonly status: number) {
-    super(String(status))
+  constructor (public readonly status: number, public readonly serverMessage = '') {
+    super(serverMessage === '' ? String(status) : serverMessage)
+    this.name = 'ActionHttpError'
   }
 }
 
@@ -50,6 +51,15 @@ export const actionFetch = async (path: string, data?: object, signal?: AbortSig
     headers: data === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: data === undefined ? undefined : JSON.stringify(data)
   })
-  if (!response.ok) throw new ActionHttpError(response.status)
+  if (!response.ok) {
+    let message = ''
+    try {
+      const body = await response.json() as { message?: unknown } | null
+      if (typeof body?.message === 'string') message = body.message
+    } catch {
+      message = ''
+    }
+    throw new ActionHttpError(response.status, message)
+  }
   return response
 }

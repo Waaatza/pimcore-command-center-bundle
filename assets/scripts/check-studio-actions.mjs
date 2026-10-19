@@ -281,6 +281,7 @@ const adminModule = compile('components/command-center/studio-actions.tsx', {
   '@pimcore/studio-ui-bundle/app': app,
   '@pimcore/studio-ui-bundle/components': adminComponents,
   '@tanstack/react-table': { createColumnHelper },
+  './grid-cell': { padCells: columns => columns },
   './studio-actions-api': adminApi
 }, { window: { dispatchEvent: event => windowEvents.push(event.type) }, Event })
 const renderAdmin = () => {
@@ -294,7 +295,10 @@ const renderAdmin = () => {
   for (const effect of queued) { const cleanup = effect(); if (cleanup) cleanups.push(cleanup) }
   return tree
 }
-const labeled = (tree, label) => nodes(tree).find(node => node.props?.label === label)?.props.children
+const labeled = (tree, label) => {
+  const children = nodes(tree).find(node => node.props?.label === label)?.props.children
+  return Array.isArray(children) ? children.find(child => React.isValidElement(child)) : children
+}
 
 // Lade- und Leerzustand.
 hooks.length = 0; effects = []; cleanups.length = 0; adminCalls.length = 0; windowEvents.length = 0; alertWarnings.length = 0

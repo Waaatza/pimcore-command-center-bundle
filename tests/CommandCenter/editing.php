@@ -52,6 +52,7 @@ $privateStorage = new \Watza\CommandCenterBundle\Service\PrivateJsonStorage($dir
 $workflowService = new \Watza\CommandCenterBundle\Service\CommandWorkflowService(
     $privateStorage, new CommandCenterService($csrf, $directory, 'test'),
     new \Watza\CommandCenterBundle\Service\CommandHistoryStore($privateStorage),
+    new \Watza\CommandCenterBundle\Service\StudioActionReconciler($privateStorage),
 );
 $service = new CommandScheduleService(
     $store, new CommandCenterService($csrf, $directory, 'test'), $csrf, $security, new ScheduleRecipientService(), $workflowService,

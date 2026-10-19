@@ -2,6 +2,7 @@ import { useTranslation } from '@pimcore/studio-ui-bundle/app'
 import { commandCenterUrl } from './api'
 import { WorkflowRunView, statusColor } from './workflow-run'
 import { Output } from './output'
+import { padCells } from './grid-cell'
 import { ScheduleEditor } from './schedule-editor'
 import { NotificationFields, type Recipient } from './notification-fields'
 import React, { useEffect, useState } from 'react'
@@ -248,7 +249,7 @@ export const ScheduledCommands = ({ draft, active, onEdit }: {
       {notice !== '' && <Alert type="success" message={ notice } />}
       <Title level={ 3 }>{t('command-center.ui.saved-schedules')}</Title>
       {items.length === 0 && <Text type="secondary">{t('command-center.ui.no-schedules')}</Text>}
-      <Grid autoWidth columns={ columns } data={ items } size="small" />
+      <Grid autoWidth columns={ padCells(columns) } data={ items } size="small" />
       {detail !== undefined && (
         <section>
           <Flex vertical gap={ 8 }>

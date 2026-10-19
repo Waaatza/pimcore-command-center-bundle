@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
 import { Alert, Box, Button, Content, Flex, Form, FormKit, Grid, Icon, IconSelector, Input, Select, Switch, Tag, Text, useAlertModal } from '@pimcore/studio-ui-bundle/components'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
-import { actionFetch, actionsChanged, type ActionPlacement } from './studio-actions-api'
+import { actionFetch, actionsChanged, ActionHttpError, type ActionPlacement } from './studio-actions-api'
+import { padCells } from './grid-cell'
 import type { InputField } from './input-fields'
 
 interface Binding { source: 'input' | 'fixed' | 'id' | 'path' | 'type', value?: string }
@@ -63,6 +64,7 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
   }, [active, refresh])
   const patch = (value: Partial<ActionDefinition>): void => setEditor(current => current === undefined ? current : { ...current, ...value })
   const target = editor === undefined ? undefined : (editor.targetType === 'template' ? catalog?.templates : catalog?.workflows)?.find(item => item.id === editor.targetId)
+  const targetMissing = editor !== undefined && editor.targetId !== '' && catalog !== undefined && target === undefined
   const submit = async (item: ActionDefinition, remove: boolean): Promise<void> => {
     if (catalog === undefined) return
     setBusy(true); setError('')
@@ -72,7 +74,11 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
       setEditor(undefined)
       setRefresh(value => value + 1)
       window.dispatchEvent(new Event(actionsChanged))
-    } catch { setError(t('command-center.actions.error')) } finally { setBusy(false) }
+    } catch (error) {
+      setError(error instanceof ActionHttpError && error.serverMessage !== ''
+        ? error.serverMessage
+        : t('command-center.actions.error'))
+    } finally { setBusy(false) }
   }
   const confirmDelete = (item: ActionDefinition): void => {
     alertModal.warn({
@@ -95,7 +101,9 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
       cell: info => {
         const item = info.row.original
         const found = (item.targetType === 'template' ? catalog?.templates : catalog?.workflows)?.find(value => value.id === item.targetId)
-        return <Text>{ found?.label ?? '—' }</Text>
+        return found === undefined
+          ? <Tag color="error">{ t('command-center.actions.target-missing') }</Tag>
+          : <Text>{ found.label }</Text>
       }
     }),
     columnHelper.display({
@@ -145,7 +153,7 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
     {catalog === undefined && error === '' && <Content loading />}
     {catalog !== undefined && <>
       {catalog.items.length === 0 && <Text type="secondary">{ t('command-center.actions.empty') }</Text>}
-      <Grid autoWidth columns={ columns } data={ catalog.items } size="small" />
+      <Grid autoWidth columns={ padCells(columns) } data={ catalog.items } size="small" />
     </>}
     {editor !== undefined && <FormKit wrapInPanel={ false } formProps={ { disabled: busy } }>
       <FormKit.Panel theme="fieldset" title={ t('command-center.actions.section.general') }>
@@ -162,6 +170,7 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
               const [type, id] = value.split(':')
               patch({ targetType: type as 'template' | 'workflow', targetId: id, bindings: {} })
             }} />
+          {targetMissing && <Text type="warning">{ t('command-center.actions.target-unavailable') }</Text>}
         </Form.Item>
         <Form.Item label={ t('command-center.actions.icon') }>
           <IconSelector value={{ type: editor.iconType ?? 'name', value: editor.icon }}
@@ -221,7 +230,7 @@ export const StudioActions = ({ active }: { active: boolean }): React.JSX.Elemen
       </FormKit.Panel>
       <Box margin={ { top: 'normal' } }>
         <Flex gap={ 12 } align="center">
-          <Button type="primary" disabled={busy || editor.label.trim() === '' || editor.targetId === '' || editor.placements.length === 0}
+          <Button type="primary" disabled={busy || targetMissing || editor.label.trim() === '' || editor.targetId === '' || editor.placements.length === 0}
             onClick={() => { void submit(editor, false) }}>{t('command-center.actions.save')}</Button>
           {editor.id !== undefined && <Button danger disabled={busy} onClick={() => confirmDelete(editor)}>{t('command-center.actions.delete')}</Button>}
           <Button disabled={busy} onClick={() => { setEditor(undefined) }}>{t('command-center.templates.cancel')}</Button>

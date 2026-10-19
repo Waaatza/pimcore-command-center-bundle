@@ -5,6 +5,7 @@ import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { commandCenterUrl } from './api'
 import { type CommandDraft } from './scheduled-commands'
 import { tooltipButtonStyle } from './command-templates.styles'
+import { padCells } from './grid-cell'
 import { NotificationFields, type Recipient } from './notification-fields'
 import { WorkflowRunView } from './workflow-run'
 import { StepList } from './step-list'
@@ -234,7 +235,7 @@ export const Workflows = ({ active, draft, onScheduled }: {
     </Flex>
     {error !== '' && editor === undefined && item === undefined && <Alert type="error" message={ error } />}
     {items.length === 0 && <Text type="secondary">{t('command-center.workflows.empty')}</Text>}
-    <Grid autoWidth columns={ columns } data={ items } size="small" />
+    <Grid autoWidth columns={ padCells(columns) } data={ items } size="small" />
     {busy && <Text role="status">{t('command-center.status.running-progress')}</Text>}
     {editor !== undefined && <WindowModal open={ active } size="L" limitContentHeight
       title={ editor.id === undefined ? t('command-center.workflows.new') : t('command-center.workflows.edit') }

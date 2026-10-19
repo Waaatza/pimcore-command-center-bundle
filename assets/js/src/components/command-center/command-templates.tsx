@@ -4,6 +4,7 @@ import { Alert, Block, Button, Flex, Form, FormKit, Grid, Input, Select, Tag, Te
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { commandCenterUrl } from './api'
 import { Output } from './output'
+import { padCells } from './grid-cell'
 import { tooltipButtonStyle } from './command-templates.styles'
 import { InputFieldEditor as TemplateFieldRow, type InputField as Field } from './input-fields'
 import { type CommandDraft } from './scheduled-commands'
@@ -209,7 +210,7 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
     </Flex>
     {error !== '' && editor === undefined && item === undefined && <Alert type="error" message={ error } />}
     {items.length === 0 && <Text type="secondary">{t('command-center.templates.empty')}</Text>}
-    <Grid autoWidth columns={ columns } data={ items } size="small" />
+    <Grid autoWidth columns={ padCells(columns) } data={ items } size="small" />
     {busy && <Text role="status">{t('command-center.status.running-progress')}</Text>}
     {editor !== undefined && <WindowModal open={ active } size="L" limitContentHeight
       title={ editor.id === undefined ? t('command-center.templates.new') : t('command-center.templates.edit') }

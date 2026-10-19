@@ -39,6 +39,7 @@ runInNewContext(ts.transpileModule(source, {
     if (name === '@pimcore/studio-ui-bundle/components') return components
     if (name === '@pimcore/studio-ui-bundle/app') return { useTranslation: () => ({ t: key => key, i18n: { language: 'en' } }) }
     if (name === './workflow-run') return { WorkflowRunView: 'WorkflowRunView', statusColor: () => 'success' }
+    if (name === './grid-cell') return { padCells: columns => columns }
     if (name === './output') return { Output: 'Output' }
     if (name === './api') return { commandCenterUrl: path => path }
     throw new Error(`Unexpected import: ${name}`)

@@ -18,6 +18,7 @@ final readonly class CommandWorkflowService
         private PrivateJsonStorage $storage,
         private CommandCenterService $commands,
         private CommandHistoryStore $history,
+        private StudioActionReconciler $actions,
         private ?SecurityServiceInterface $security = null,
         private CommandInputResolver $inputs = new CommandInputResolver(),
     ) {
@@ -96,6 +97,7 @@ final readonly class CommandWorkflowService
             $this->snapshot($parameters->id, $parameters->revision);
             unset($items[$parameters->id]);
         });
+        $this->actions->deactivateTarget('workflow', $parameters->id);
     }
 
     public function resolve(string $id, ?int $revision, array $values = []): array

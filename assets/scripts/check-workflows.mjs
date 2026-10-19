@@ -71,6 +71,7 @@ runInNewContext(compiled, {
     if (name === '@pimcore/studio-ui-bundle/components') return components
     if (name === '@tanstack/react-table') return { createColumnHelper }
     if (name === './api') return { commandCenterUrl: path => path }
+    if (name === './grid-cell') return { padCells: columns => columns }
     if (name === './command-templates.styles') return { tooltipButtonStyle: { display: 'inline-flex' } }
     if (name === './input-fields') return { InputFields: 'InputFields', InputFieldEditor: 'InputFieldEditor' }
     if (name === './notification-fields') return { NotificationFields: 'NotificationFields' }

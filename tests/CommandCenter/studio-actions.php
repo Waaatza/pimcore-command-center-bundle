@@ -26,7 +26,9 @@ use Symfony\Component\Security\Csrf\CsrfTokenManager;
 use Watza\CommandCenterBundle\Parameter\CommandRunParameters;
 use Watza\CommandCenterBundle\Parameter\StudioActionRequest;
 use Watza\CommandCenterBundle\Parameter\StudioActionSaveParameters;
+use Watza\CommandCenterBundle\Parameter\TemplateActionParameters;
 use Watza\CommandCenterBundle\Parameter\TemplateSaveParameters;
+use Watza\CommandCenterBundle\Parameter\WorkflowActionParameters;
 use Watza\CommandCenterBundle\Parameter\WorkflowSaveParameters;
 use Watza\CommandCenterBundle\Service\CommandCenterService;
 use Watza\CommandCenterBundle\Service\CommandHistoryStore;
@@ -36,6 +38,7 @@ use Watza\CommandCenterBundle\Service\CommandWorkflowRunner;
 use Watza\CommandCenterBundle\Service\CommandWorkflowService;
 use Watza\CommandCenterBundle\Service\PrivateJsonStorage;
 use Watza\CommandCenterBundle\Service\StudioActionAccess;
+use Watza\CommandCenterBundle\Service\StudioActionReconciler;
 use Watza\CommandCenterBundle\Service\StudioActionService;
 
 session_save_path(sys_get_temp_dir());
@@ -124,8 +127,9 @@ $storage = new PrivateJsonStorage($directory . '/data');
 $history = new CommandHistoryStore($storage);
 $commands = new CommandCenterService($csrf, $directory, 'test', $history, $security);
 $inputs = new CommandInputResolver();
-$templates = new CommandTemplateService($storage, $commands);
-$workflows = new CommandWorkflowService($storage, $commands, $history, $security);
+$reconciler = new StudioActionReconciler($storage);
+$templates = new CommandTemplateService($storage, $commands, $reconciler);
+$workflows = new CommandWorkflowService($storage, $commands, $history, $reconciler, $security);
 $access = new StudioActionAccess($storage, $security, $elements, $users);
 $service = new StudioActionService($storage, $access, $commands, $templates, $workflows, $history, $inputs,
     $csrf, $users, $roles);
@@ -324,5 +328,21 @@ try {
     $reject(fn () => $service->prepare($request($action)), ConflictHttpException::class);
     $security->current = $admin;
     $service->delete($request($updated));
+
+    $orphanTemplate = $templates->save(new TemplateSaveParameters($token, 'Orphan', 'test:echo'));
+    $orphan = $save(['targetId' => $orphanTemplate['id'], 'enabled' => true]);
+    $valid = $save(['targetId' => $template['id'], 'enabled' => true]);
+    $templates->delete(new TemplateActionParameters($token, $orphanTemplate['id'], $orphanTemplate['revision']));
+    $catalog = $access->catalog();
+    $check(!$catalog[$orphan['id']]['enabled'] && $catalog[$orphan['id']]['revision'] === $orphan['revision'] + 1,
+        'Deleting a template did not deactivate its action.');
+    $check($catalog[$valid['id']]['enabled'] === true, 'Deleting a template disabled an unrelated action.');
+    $orphanWorkflow = $workflows->save(new WorkflowSaveParameters($token, 'Orphan', steps: [
+        ['label' => 'Noop', 'command' => 'test:echo', 'tokens' => []],
+    ]));
+    $workflowOrphan = $save(['targetType' => 'workflow', 'targetId' => $orphanWorkflow['id'], 'enabled' => true]);
+    $workflows->delete(new WorkflowActionParameters($token, $orphanWorkflow['id'], $orphanWorkflow['revision']));
+    $check($access->catalog()[$workflowOrphan['id']]['enabled'] === false,
+        'Deleting a workflow did not deactivate its action.');
 } finally { $remove($directory); }
 echo "Studio action grants, contexts, revisions, output isolation and queued authorization checks passed.\n";

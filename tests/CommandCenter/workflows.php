@@ -15,6 +15,7 @@ use Watza\CommandCenterBundle\Service\CommandHistoryStore;
 use Watza\CommandCenterBundle\Service\CommandWorkflowService;
 use Watza\CommandCenterBundle\Service\CommandWorkflowRunner;
 use Watza\CommandCenterBundle\Service\PrivateJsonStorage;
+use Watza\CommandCenterBundle\Service\StudioActionReconciler;
 
 session_save_path(sys_get_temp_dir());
 $directory = sys_get_temp_dir() . '/command-workflows-' . bin2hex(random_bytes(8));
@@ -33,7 +34,7 @@ $token = $csrf->getToken('command-center')->getValue();
 $storage = new PrivateJsonStorage($directory . '/data');
 $history = new CommandHistoryStore($storage);
 $commands = new CommandCenterService($csrf, $directory, 'test', $history);
-$workflows = new CommandWorkflowService($storage, $commands, $history);
+$workflows = new CommandWorkflowService($storage, $commands, $history, new StudioActionReconciler($storage));
 $runner = new CommandWorkflowRunner($storage, $commands, $history);
 $check = static function (bool $condition, string $message): void {
     if (!$condition) { throw new RuntimeException($message); }

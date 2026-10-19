@@ -15,6 +15,7 @@ use Watza\CommandCenterBundle\Service\CommandCenterService;
 use Watza\CommandCenterBundle\Service\CommandHistoryStore;
 use Watza\CommandCenterBundle\Service\CommandTemplateService;
 use Watza\CommandCenterBundle\Service\PrivateJsonStorage;
+use Watza\CommandCenterBundle\Service\StudioActionReconciler;
 
 session_save_path(sys_get_temp_dir());
 $directory = sys_get_temp_dir() . '/command-templates-' . bin2hex(random_bytes(8));
@@ -51,7 +52,7 @@ $provider = new class implements CommandPreviewProviderInterface {
         return new CommandPreviewResult(42, [['label' => '/test/one', 'before' => 'old', 'after' => 'New']]);
     }
 };
-$service = new CommandTemplateService($storage, $commands, [$provider]);
+$service = new CommandTemplateService($storage, $commands, new StudioActionReconciler($storage), [$provider]);
 $check = static function (bool $condition, string $message): void {
     if (!$condition) { throw new RuntimeException($message); }
 };
