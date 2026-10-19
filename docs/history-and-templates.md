@@ -41,7 +41,11 @@ all workers and web instances must see the same files and support atomic rename/
 
 ## Reusable templates
 
-In **Templates**, create a template or use **From direct execution** to copy a configured command.
+In **Templates**, the overview lists every template with its command, input-field count and preview
+support. Create one with **New template** or use **From direct execution** to copy a configured command;
+**Details** opens the run panel, **Edit** the editor and **Delete** asks for confirmation first.
+Every row also offers **Run**; templates that need a preview or input fields keep it disabled and point to
+the details, where the command is previewed or configured before execution.
 For `pimcore:run-script`, an additional PHP field accepts inline source, including code copied from direct execution.
 The saved source is executed unchanged and recorded in history. Read resolved input values with
 `json_decode(getenv('COMMAND_CENTER_INPUTS'), true, 512, JSON_THROW_ON_ERROR)`; placeholders are not expanded
@@ -63,7 +67,7 @@ Each field has a unique placeholder name, label, optional default and required s
 ```
 
 Add `folder` (Text), `limit` (Integer, default `10`) and `mode` (Choice, e.g. `update` / `check`).
-Selecting the template renders ordinary input fields; users do not have to edit JSON to run it.
+Opening a template renders ordinary input fields; users do not have to edit JSON to run it.
 Values are substituted into individual argument tokens and are never interpreted by a shell.
 A positional value cannot start with `-`; write options as `--name={{value}}` in a single token.
 The server rejects unknown fields, invalid types, undefined placeholders and protected global options.

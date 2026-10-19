@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Block, Button, Flex, Form, FormKit, Input, Select, Text, TextArea, Title } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Block, Button, Flex, Form, FormKit, Grid, Input, Select, Tag, Text, TextArea, Title, Tooltip, useAlertModal } from '@pimcore/studio-ui-bundle/components'
+import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { commandCenterUrl } from './api'
 import { Output } from './output'
 import { InputFieldEditor as TemplateFieldRow, type InputField as Field } from './input-fields'
@@ -29,9 +30,12 @@ interface EditorValues {
 }
 const blank = (): Template => ({ label: '', description: '', command: '', tokens: [], fields: [] })
 
+const columnHelper = createColumnHelper<Template>()
+
 
 export const CommandTemplates = ({ active, draft }: { active: boolean, draft: CommandDraft }): React.JSX.Element => {
   const { t } = useTranslation()
+  const alertModal = useAlertModal()
   const [editorForm] = Form.useForm<EditorValues>()
   const [items, setItems] = useState<Template[]>([])
   const [selected, setSelected] = useState<string>()
@@ -46,7 +50,6 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
   const [output, setOutput] = useState('')
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
-  const [deletePending, setDeletePending] = useState(false)
   const controller = useRef<AbortController>()
   const item = items.find(value => value.id === selected)
   const previewRequest = JSON.stringify({ id: item?.id, revision: item?.revision, values })
@@ -72,20 +75,39 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
     if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`)
     return response
   }
-  const actionData = (): object => ({ id: item?.id, revision: item?.revision, values })
+  const actionData = (value: Template): object => ({ id: value.id, revision: value.revision, values })
   const perform = async (action: () => Promise<void>): Promise<void> => {
     setBusy(true); setError('')
     try { await action() } catch (reason) { setError(String(reason)) } finally { setBusy(false) }
   }
   const edit = (value: Template): void => {
-    setEditor({ ...value, fields: value.fields.map(field => ({ ...field })) }); setTokens(JSON.stringify(value.tokens, null, 2)); setDeletePending(false); setSession(current => current + 1)
+    setEditor({ ...value, fields: value.fields.map(field => ({ ...field })) }); setTokens(JSON.stringify(value.tokens, null, 2)); setSession(current => current + 1)
   }
-  const run = async (): Promise<void> => {
+  const open = (value: Template): void => {
+    setSelected(value.id); setValues({}); setPreview(undefined); setEditor(undefined); setOutput(''); setError('')
+  }
+  const runFromRow = (value: Template): void => {
+    open(value)
+    void perform(() => run(value))
+  }
+  const confirmDelete = (value: Template): void => {
+    alertModal.warn({
+      title: t('command-center.templates.delete'),
+      content: t('command-center.templates.delete-confirm'),
+      okButtonProps: { danger: true },
+      onOk: () => { void perform(async () => {
+        await post('delete', { id: value.id, revision: value.revision, values })
+        if (selected === value.id) setSelected(undefined)
+        setRefresh(current => current + 1)
+      }) }
+    })
+  }
+  const run = async (value: Template): Promise<void> => {
     const abort = new AbortController(); controller.current = abort
     setOutput('')
     setPreview(undefined)
     try {
-      const response = await post('run', actionData(), abort.signal)
+      const response = await post('run', actionData(value), abort.signal)
       if (response.body === null) throw new Error(t('command-center.error.stream'))
       const reader = response.body.getReader(); const decoder = new TextDecoder()
       let pending = ''; let completed = false
@@ -105,8 +127,8 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
         if (done) break
       }
       if (!completed) throw new Error(t('command-center.error.disconnected'))
-      if (item?.previewSupported === true) {
-        const updated = await post('preview', actionData(), abort.signal)
+      if (value.previewSupported === true) {
+        const updated = await post('preview', actionData(value), abort.signal)
         const result = await updated.json() as Preview
         if (!abort.signal.aborted) setPreview({ result, request: previewRequest })
       }
@@ -132,15 +154,48 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
       setSelected(saved.id); setValues({}); setPreview(undefined); setEditor(undefined); setRefresh(value => value + 1)
     })
   }
+  const columns: ColumnDef<any, any>[] = [
+    columnHelper.accessor('label', {
+      header: t('command-center.templates.label'), size: 260,
+      cell: info => <Flex vertical gap={ 0 }>
+        <Text>{ info.getValue() }</Text>
+        <Text code>{ info.row.original.command }</Text>
+      </Flex>
+    }),
+    columnHelper.display({
+      id: 'fields', header: t('command-center.templates.fields'), size: 120,
+      cell: info => <Text type={ info.row.original.fields.length === 0 ? 'secondary' : undefined }>{ info.row.original.fields.length }</Text>
+    }),
+    columnHelper.display({
+      id: 'preview', header: t('command-center.templates.preview-short'), size: 140,
+      cell: info => info.row.original.previewSupported === true
+        ? <Tag color="success">{ t('command-center.ui.yes') }</Tag>
+        : <Tag>{ t('command-center.ui.no') }</Tag>
+    }),
+    columnHelper.display({
+      id: 'actions', header: t('command-center.ui.actions'), size: 260,
+      cell: info => {
+        const value = info.row.original
+        const runHint = value.previewSupported === true
+          ? t('command-center.templates.run-preview-hint')
+          : (value.fields.length > 0 ? t('command-center.templates.run-fields-hint') : undefined)
+        return <Flex gap={ 8 } wrap align="center">
+          <Tooltip title={ runHint }>
+            <span>
+              <Button type="primary" disabled={ busy || runHint !== undefined }
+                onClick={() => runFromRow(value) }>{t('command-center.ui.execute')}</Button>
+            </span>
+          </Tooltip>
+          <Button disabled={ busy } onClick={() => open(value) }>{t('command-center.ui.details')}</Button>
+          <Button disabled={ busy } onClick={() => edit(value) }>{t('command-center.ui.edit')}</Button>
+          <Button danger disabled={ busy } onClick={() => confirmDelete(value) }>{t('command-center.ui.delete')}</Button>
+        </Flex>
+      }
+    })
+  ]
   return <Flex vertical gap={ 16 }>
     <Text type="secondary">{t('command-center.templates.help')}</Text>
-    <Flex gap={ 12 }>
-      <Flex style={ { flex: 1 } }>
-        <Select style={ { width: '100%', maxWidth: 'none' } } value={selected} disabled={busy} placeholder={t('command-center.templates.choose')}
-          popupMatchSelectWidth={ false }
-          options={items.map(value => ({ value: value.id, label: value.label }))}
-          onChange={(id: string) => { setSelected(id); setValues({}); setPreview(undefined); setEditor(undefined); setOutput(''); setDeletePending(false); setError('') }} />
-      </Flex>
+    <Flex gap={ 12 } justify="flex-end">
       <Button disabled={busy} onClick={() => edit(blank())}>{t('command-center.templates.new')}</Button>
       <Button disabled={busy || draft.command === undefined} onClick={() => {
         try { const args: unknown = JSON.parse(draft.tokens)
@@ -148,9 +203,10 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
           edit({ ...blank(), command: draft.command ?? '', tokens: args as string[], phpCode: draft.phpCode })
         } catch (reason) { setError(String(reason)) }
       }}>{t('command-center.templates.from-draft')}</Button>
-      {item !== undefined && <Button disabled={busy} onClick={() => edit(item)}>{t('command-center.templates.edit')}</Button>}
     </Flex>
     {error !== '' && <Alert type="error" message={ error } />}
+    {items.length === 0 && <Text type="secondary">{t('command-center.templates.empty')}</Text>}
+    <Grid columns={ columns } data={ items } size="small" />
     {editor !== undefined ? (
       <FormKit key={ session } wrapInPanel={ false } formProps={ { form: editorForm, disabled: busy, initialValues: { fields: editor.fields } } }>
         <Flex vertical gap={ 12 }>
@@ -207,11 +263,10 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
           ))}
           <Flex gap={ 12 }>
             <Button disabled={busy || item.previewSupported !== true} onClick={() => { void perform(async () => {
-              const response = await post('preview', actionData())
+              const response = await post('preview', actionData(item))
               setPreview({ result: await response.json() as Preview, request: previewRequest })
             }) }}>{t('command-center.templates.preview')}</Button>
-            <Button type="primary" disabled={busy || (item.previewSupported === true && preview?.supported !== true)} onClick={() => { void perform(run) }}>{t('command-center.ui.execute')}</Button>
-            <Button disabled={busy} onClick={() => setDeletePending(true)}>{t('command-center.templates.delete')}</Button>
+            <Button type="primary" disabled={busy || (item.previewSupported === true && preview?.supported !== true)} onClick={() => { void perform(() => run(item)) }}>{t('command-center.ui.execute')}</Button>
           </Flex>
           {item.previewSupported !== true && <Text type="secondary">{t('command-center.templates.no-preview')}</Text>}
           {preview?.supported === true && (
@@ -220,15 +275,6 @@ export const CommandTemplates = ({ active, draft }: { active: boolean, draft: Co
               <Text>{preview.message}</Text>
               <Text type="secondary">{t('command-center.templates.preview-help')}</Text>
               <ul>{preview.samples?.map((sample, index) => <li key={index}><Text strong>{sample.label}</Text> {sample.before} {sample.after === undefined ? '' : `→ ${sample.after}`}</li>)}</ul>
-            </Flex>
-          )}
-          {deletePending && (
-            <Flex vertical gap={ 8 }>
-              <Alert type="warning" message={ t('command-center.templates.delete-confirm') } />
-              <Flex gap={ 12 }>
-                <Button danger disabled={busy} onClick={() => { void perform(async () => { await post('delete', actionData()); setSelected(undefined); setDeletePending(false); setRefresh(value => value + 1) }) }}>{t('command-center.templates.delete')}</Button>
-                <Button disabled={busy} onClick={() => setDeletePending(false)}>{t('command-center.templates.cancel')}</Button>
-              </Flex>
             </Flex>
           )}
         </Flex>
