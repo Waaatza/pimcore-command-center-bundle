@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@pimcore/studio-ui-bundle/app'
-import { Alert, Block, Button, Flex, Form, FormKit, Input, Select, Text, TextArea, Title } from '@pimcore/studio-ui-bundle/components'
+import { Alert, Block, Button, Flex, Form, FormKit, Grid, Input, Select, Text, TextArea, Title, Tooltip, useAlertModal } from '@pimcore/studio-ui-bundle/components'
+import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { commandCenterUrl } from './api'
 import { type CommandDraft } from './scheduled-commands'
+import { tooltipButtonStyle } from './command-templates.styles'
 import { NotificationFields, type Recipient } from './notification-fields'
 import { WorkflowRunView } from './workflow-run'
 import { StepList } from './step-list'
@@ -17,6 +19,8 @@ const emptyStep = (): EditableStep => ({ label: '', command: '', tokens: '[]', p
 const normalizeStep = (step: Partial<EditableStep> | undefined): EditableStep => ({
   label: step?.label ?? '', command: step?.command ?? '', tokens: step?.tokens ?? '[]', phpCode: step?.phpCode ?? null
 })
+
+const columnHelper = createColumnHelper<Workflow>()
 
 const WorkflowStepRow = ({ step, commands }: { step?: EditableStep, commands: string[] }): React.JSX.Element => {
   const { t } = useTranslation()
@@ -44,6 +48,7 @@ export const Workflows = ({ active, draft, onScheduled }: {
   active: boolean, draft: CommandDraft, onScheduled: () => void
 }): React.JSX.Element => {
   const { t } = useTranslation()
+  const alertModal = useAlertModal()
   const [editorForm] = Form.useForm<EditorValues>()
   const [items, setItems] = useState<Workflow[]>([])
   const [commands, setCommands] = useState<string[]>([])
@@ -59,7 +64,6 @@ export const Workflows = ({ active, draft, onScheduled }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
-  const [deleting, setDeleting] = useState(false)
   const [scheduling, setScheduling] = useState(false)
   const [runAt, setRunAt] = useState('')
   const [repeat, setRepeat] = useState('once')
@@ -122,7 +126,7 @@ export const Workflows = ({ active, draft, onScheduled }: {
     editorForm.setFieldValue('steps', patched)
   }
   const edit = (workflow?: Workflow): void => {
-    setDeleting(false); setScheduling(false)
+    setScheduling(false)
     const steps = workflow === undefined
       ? [emptyStep()]
       : workflow.steps.map(step => ({ ...step, tokens: JSON.stringify(step.tokens, null, 2) }))
@@ -130,6 +134,32 @@ export const Workflows = ({ active, draft, onScheduled }: {
     setInitial({ label: workflow?.label ?? '', description: workflow?.description ?? '', steps, fields: workflow?.fields ?? [] })
     setEditor({ id: workflow?.id, revision: workflow?.revision })
     setSession(current => current + 1)
+  }
+  const open = (workflow: Workflow): void => {
+    setSelected(workflow.id); setValues({}); setEditor(undefined); setScheduling(false); setRunId(undefined); setError('')
+  }
+  const run = (workflow: Workflow, runValues: Record<string, string>): void => {
+    void perform(async () => {
+      const response = await post('workflows/run', { id: workflow.id, revision: workflow.revision, values: runValues })
+      const queued = await response.json() as { id: string }
+      setRunId(queued.id)
+    })
+  }
+  const runFromRow = (workflow: Workflow): void => {
+    open(workflow)
+    run(workflow, {})
+  }
+  const confirmDelete = (workflow: Workflow): void => {
+    alertModal.warn({
+      title: t('command-center.workflows.delete'),
+      content: t('command-center.workflows.delete-confirm'),
+      okButtonProps: { danger: true },
+      onOk: () => { void perform(async () => {
+        await post('workflows/delete', { id: workflow.id, revision: workflow.revision, values: {} })
+        if (selected === workflow.id) setSelected(undefined)
+        setRefresh(value => value + 1)
+      }) }
+    })
   }
   const currentSteps = (): EditableStep[] => (editorForm.getFieldsValue(true).steps ?? []).map(normalizeStep)
   const appendDraftStep = (): void => {
@@ -157,19 +187,52 @@ export const Workflows = ({ active, draft, onScheduled }: {
       setSelected(saved.id); setEditor(undefined); setRefresh(value => value + 1)
     })
   }
+  const columns: ColumnDef<any, any>[] = [
+    columnHelper.accessor('label', {
+      header: t('command-center.templates.label'), size: 240, meta: { autoWidth: true },
+      cell: info => <Flex vertical gap={ 0 }>
+        <Text>{ info.getValue() }</Text>
+        {info.row.original.description !== '' && <Text type="secondary">{ info.row.original.description }</Text>}
+      </Flex>
+    }),
+    columnHelper.display({
+      id: 'steps', header: t('command-center.workflows.steps'), size: 110,
+      cell: info => <Text>{ info.row.original.steps.length }</Text>
+    }),
+    columnHelper.display({
+      id: 'fields', header: t('command-center.templates.fields'), size: 120,
+      cell: info => {
+        const count = (info.row.original.fields ?? []).length
+        return <Text type={ count === 0 ? 'secondary' : undefined }>{ count }</Text>
+      }
+    }),
+    columnHelper.display({
+      id: 'actions', header: t('command-center.ui.actions'), size: 420,
+      cell: info => {
+        const value = info.row.original
+        const runHint = (value.fields ?? []).length > 0 ? t('command-center.workflows.run-fields-hint') : undefined
+        return <Flex gap={ 8 } wrap align="center">
+          <Tooltip title={ runHint }>
+            <span style={ tooltipButtonStyle }>
+              <Button type="primary" disabled={ busy || runHint !== undefined }
+                onClick={() => runFromRow(value) }>{t('command-center.ui.execute')}</Button>
+            </span>
+          </Tooltip>
+          <Button disabled={ busy } onClick={() => open(value) }>{t('command-center.ui.details')}</Button>
+          <Button disabled={ busy } onClick={() => edit(value) }>{t('command-center.ui.edit')}</Button>
+          <Button danger disabled={ busy } onClick={() => confirmDelete(value) }>{t('command-center.ui.delete')}</Button>
+        </Flex>
+      }
+    })
+  ]
   return <Flex vertical gap={ 16 }>
     <Text type="secondary">{t('command-center.workflows.help')}</Text>
-    <Flex gap={ 12 }>
-      <Flex style={ { flex: 1 } }>
-        <Select disabled={busy} style={ { width: '100%', maxWidth: 'none' } } placeholder={t('command-center.workflows.choose')} value={selected}
-          options={items.map(value => ({ value: value.id, label: value.label }))} onChange={(id: string) => {
-            setSelected(id); setValues({}); setEditor(undefined); setDeleting(false); setScheduling(false); setRunId(undefined); setError('')
-          }} />
-      </Flex>
+    <Flex gap={ 12 } justify="flex-end">
       <Button disabled={busy} onClick={() => edit()}>{t('command-center.workflows.new')}</Button>
-      {item !== undefined && <Button disabled={busy} onClick={() => edit(item)}>{t('command-center.workflows.edit')}</Button>}
     </Flex>
     {error !== '' && <Alert type="error" message={ error } />}
+    {items.length === 0 && <Text type="secondary">{t('command-center.workflows.empty')}</Text>}
+    <Grid autoWidth columns={ columns } data={ items } size="small" />
     {editor !== undefined ? (
       <FormKit key={ session } wrapInPanel={ false } formProps={ { form: editorForm, disabled: busy, initialValues: initial, onValuesChange } }>
         <Flex vertical gap={ 12 }>
@@ -209,24 +272,9 @@ export const Workflows = ({ active, draft, onScheduled }: {
           <React.Fragment key={ index }><Text strong>{step.label}</Text> · <Text code>{step.command}</Text></React.Fragment>
         )) } />
         <Flex gap={ 12 }>
-          <Button type="primary" disabled={busy} onClick={() => { void perform(async () => {
-            const response = await post('workflows/run', { id: item.id, revision: item.revision, values })
-            const run = await response.json() as { id: string }; setRunId(run.id)
-          }) }}>{t('command-center.workflows.run')}</Button>
-          <Button disabled={busy} onClick={() => { setScheduling(true); setDeleting(false) }}>{t('command-center.workflows.schedule')}</Button>
-          <Button disabled={busy} onClick={() => { setDeleting(true); setScheduling(false) }}>{t('command-center.workflows.delete')}</Button>
+          <Button type="primary" disabled={busy} onClick={() => run(item, values)}>{t('command-center.workflows.run')}</Button>
+          <Button disabled={busy} onClick={() => setScheduling(true)}>{t('command-center.workflows.schedule')}</Button>
         </Flex>
-        {deleting && (
-          <Flex vertical gap={ 8 }>
-            <Alert type="warning" message={ t('command-center.workflows.delete-confirm') } />
-            <Flex gap={ 12 }>
-              <Button danger disabled={busy} onClick={() => { void perform(async () => {
-                await post('workflows/delete', { id: item.id, revision: item.revision, values }); setSelected(undefined); setDeleting(false); setRefresh(value => value + 1)
-              }) }}>{t('command-center.workflows.delete')}</Button>
-              <Button disabled={busy} onClick={() => setDeleting(false)}>{t('command-center.templates.cancel')}</Button>
-            </Flex>
-          </Flex>
-        )}
         {scheduling && (
           <FormKit wrapInPanel={ false } formProps={ { disabled: busy } }>
             <FormKit.Panel theme="fieldset" title={ t('command-center.workflows.schedule') }>

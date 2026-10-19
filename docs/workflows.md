@@ -2,9 +2,13 @@
 
 ## Sequential background runs
 
-The **Workflows** tab chains several commands into one run. **New workflow** opens an editor with a
-label, a description and a list of steps. **From direct execution** appends the command configured in
-the **Direct execution** tab to the step list. Steps can be added, removed and moved; each step has
+The **Workflows** tab chains several commands into one run. The overview lists every workflow with its
+description, step count and input-field count; **Details** opens the run panel, **Edit** the editor and
+**Delete** asks for confirmation first. Every row also offers **Run**; workflows that define input fields
+keep it disabled and point to the details, where the values are configured before execution.
+**New workflow** opens an editor with a label, a description and a list of steps. **From direct execution**
+appends the command configured in the **Direct execution** tab to the step list. Steps can be added,
+removed and moved; each step has
 
 - its own label (shown as the step title in the output and in history),
 - a command selected from the registered console commands,
