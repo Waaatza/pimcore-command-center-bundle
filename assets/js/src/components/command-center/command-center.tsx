@@ -4,6 +4,7 @@ import { Output } from './output'
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Collapse, Content, Flex, Form, FormKit, Select, Tabs, Text, TextArea, Title } from '@pimcore/studio-ui-bundle/components'
 
+import { RunningIndicator } from './running-indicator'
 import { Workflows } from './workflows'
 import { StudioActions } from './studio-actions'
 import { InteractiveTerminal } from './interactive-terminal'
@@ -29,7 +30,10 @@ export const CommandCenter = (): React.JSX.Element => {
 
   return (
     <Content padded padding="large">
-      <Title level={ 2 }>{t('command-center.ui.title')}</Title>
+      <Flex align="center" gap={ 8 }>
+        <Title level={ 2 }>{t('command-center.ui.title')}</Title>
+        <RunningIndicator />
+      </Flex>
       <Tabs activeKey={ tab } onChange={ setTab } noPadding items={ [
         { key: 'direct', label: t('command-center.tabs.direct'), children: <CommandRunner onDraftChange={ setDraft } /> },
         { key: 'workflows', label: t('command-center.tabs.workflows'), children: <Workflows active={tab === 'workflows'} draft={draft} onScheduled={() => setTab('scheduled')} /> },

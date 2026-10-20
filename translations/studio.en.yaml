@@ -19,6 +19,7 @@ command_center_updateschedule_success: Schedule updated
 command-center.tabs.direct: "Direct execution"
 command-center.tabs.scheduled: "Scheduled executions"
 command-center.ui.title: "Command Control Center"
+command-center.ui.running-count: "{{count}} running"
 command-center.ui.choose-command: "Choose a Symfony command"
 command-center.ui.arguments: "Arguments and options"
 command-center.ui.required: " (required)"

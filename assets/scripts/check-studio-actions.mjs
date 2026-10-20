@@ -28,7 +28,6 @@ const registration = compile('modules/command-center.ts', {
     : { registerWidget: () => {}, registerMainNavItem: () => {} } } },
   '@pimcore/studio-ui-bundle/app': { serviceIds: { 'App/ComponentRegistry/ComponentRegistry': 'registry' } },
   '../components/command-center/command-center': { CommandCenter: () => null },
-  '../components/command-center/nav-title': { CommandCenterNavTitle: () => null },
   '../components/command-center/studio-action-buttons': {
     GlobalActionButtons: () => null, ObjectActionButtons: () => null,
     AssetActionButtons: () => null, DocumentActionButtons: () => null

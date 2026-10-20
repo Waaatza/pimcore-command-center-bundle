@@ -103,11 +103,11 @@ render(false)
 assert.equal(intervals.size, 0, 'History polling survived tab deactivation')
 console.log('History detail modal, loading, reopen, abort, stale responses, parent navigation and errors checked.')
 
-// Der Navigations-Badge zaehlt nur laufende/queued Runs und stoppt mit dem Unmount.
+// Der Lauf-Indikator zaehlt nur laufende/queued Runs und blendet bei null aus.
 const badgeIntervals = new Set()
 let badgeItems = []
 const badgeExports = {}
-const badgeSource = readFileSync(new URL('../js/src/components/command-center/nav-title.tsx', import.meta.url), 'utf8')
+const badgeSource = readFileSync(new URL('../js/src/components/command-center/running-indicator.tsx', import.meta.url), 'utf8')
 runInNewContext(ts.transpileModule(badgeSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, esModuleInterop: true }
 }).outputText, {
@@ -129,7 +129,7 @@ const renderBadge = () => {
   const previous = internal.current
   internal.current = dispatcher
   let tree
-  try { tree = badgeExports.CommandCenterNavTitle() } finally { internal.current = previous }
+  try { tree = badgeExports.RunningIndicator() } finally { internal.current = previous }
   const queued = effects; effects = []
   for (const effect of queued) effect()
   return tree
@@ -138,10 +138,10 @@ hooks.length = 0
 badgeItems = [{ status: 'running', active: true }, { status: 'running', active: true }, { status: 'running', active: false }]
 renderBadge(); await settle()
 let badgeTree = renderBadge()
-assert.equal(nodes(badgeTree).some(node => node.type === 'Tag' && node.props.color === 'processing' && node.props.children === 2), true, 'Nav badge did not count active runs')
+assert.equal(nodes(badgeTree).some(node => node.type === 'Tag' && node.props.color === 'processing' && node.props.role === 'status'), true, 'Running indicator did not show active runs')
 hooks.length = 0
 badgeItems = []
 renderBadge(); await settle()
 badgeTree = renderBadge()
-assert.equal(nodes(badgeTree).some(node => node.type === 'Tag'), false, 'Nav badge stayed visible without active runs')
-console.log('Navigation badge counts active runs and hides when idle.')
+assert.equal(nodes(badgeTree).some(node => node.type === 'Tag'), false, 'Running indicator stayed visible without active runs')
+console.log('Running indicator counts active runs and hides when idle.')

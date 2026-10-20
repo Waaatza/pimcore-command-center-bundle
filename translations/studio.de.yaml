@@ -19,6 +19,7 @@ command_center_updateschedule_success: Zeitplan aktualisiert
 command-center.tabs.direct: "Direkt ausführen"
 command-center.tabs.scheduled: "Geplante Ausführungen"
 command-center.ui.title: "Command Control Center"
+command-center.ui.running-count: "{{count}} laufend"
 command-center.ui.choose-command: "Symfony-Command auswählen"
 command-center.ui.arguments: "Argumente und Optionen"
 command-center.ui.required: " (Pflicht)"

@@ -9,7 +9,7 @@ Run Symfony console commands and PHP scripts from Pimcore Studio, or schedule th
 - Paste PHP directly for `pimcore:run-script`.
 - Schedule one-time, hourly, daily or weekly executions.
 - Edit, enable/disable/delete plans and inspect the latest output and status.
-- Persistent run history with input/output snapshots, filters and pagination; running executions can be closed and reopened from history, and a navigation badge shows how many are active.
+- Persistent run history with input/output snapshots, filters and pagination; running executions can be closed and reopened from history, and the tab header shows how many are active.
 - Reusable command templates with input fields, inline PHP and opt-in read-only object previews.
 - Multi-step workflows that run commands in the background and stop at the first failure.
 - Schedule a workflow as a fixed snapshot, with per-step progress in the run history.
@@ -267,5 +267,12 @@ COMMAND_CENTER_AUTOLOAD=/path/to/project/vendor/autoload.php php tests/CommandCe
 
 This project was inspired by the [Job Manager available in the Pimcore Store](https://store.pimcore.com/shop/job-manager-213).
 It is an independent implementation and is not affiliated with or endorsed by the Job Manager's authors.
+
+## Built with AI assistance
+
+This bundle was created with the help of a friendly combination of
+[Codex](https://openai.com/codex) and [opencode](https://opencode.ai): the two assistants worked together
+on the code, tests, documentation and the many small decisions in between, with a human reviewing the
+result. Please keep that in mind when reading the code — and enjoy.
 
 MIT licensed. Pimcore and its Studio SDK retain their own licenses.

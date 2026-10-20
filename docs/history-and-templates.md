@@ -16,7 +16,7 @@ the details of a step offers **Open workflow run** to move back to the combined 
 
 Filter by command/label, status (including *Queued*) or trigger (including *Workflow*). The list is paginated (25 runs per page); details show the
 saved input and output. **Details** opens a dialog with a loading state, error messages, the saved snapshot and output.
-An active history tab refreshes every five seconds; the navigation badge shows how many runs are queued or running.
+An active history tab refreshes every five seconds; the Command Center header shows how many runs are queued or running.
 The server updates output approximately once a second when output arrives and writes the final result when execution ends.
 Only the last 1 MB of output is retained per run; truncated output is explicitly marked.
 
