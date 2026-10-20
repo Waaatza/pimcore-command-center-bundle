@@ -1,0 +1,43 @@
+{
+  "allFiles": [
+    "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/css/async/__federation_expose_default_export.2b90f0d9d3.css",
+    "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/async/__federation_expose_default_export.da1e7b2a3c.js",
+    "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/main.bc31a3031a.js",
+    "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/async/e.dbbfb4402d.js",
+    "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/0.d12db1aa09.js",
+    "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/remoteEntry.js",
+    "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/mf-stats.json",
+    "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/mf-manifest.json",
+    "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/main.html"
+  ],
+  "entries": {
+    "watza_command_center_bundle": {
+      "initial": {
+        "js": [
+          "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/remoteEntry.js"
+        ]
+      },
+      "async": {
+        "js": [
+          "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/async/__federation_expose_default_export.da1e7b2a3c.js",
+          "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/async/e.dbbfb4402d.js"
+        ],
+        "css": [
+          "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/css/async/__federation_expose_default_export.2b90f0d9d3.css"
+        ]
+      }
+    },
+    "main": {
+      "html": [
+        "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/main.html"
+      ],
+      "initial": {
+        "js": [
+          "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/0.d12db1aa09.js",
+          "/bundles/pimcorecommandcenter/build/4c9ae995-4fa9-4516-907a-d9d0f109976c/static/js/main.bc31a3031a.js"
+        ]
+      }
+    }
+  },
+  "integrity": {}
+}
